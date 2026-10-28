@@ -57,6 +57,9 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // Renderiza a view inicial no Mapa Territorial
   renderView("mapa");
+
+  // Bloqueio de Segurança Obrigatório: exige login e senha a cada entrada no site
+  verificarAutenticacaoObrigatoria();
 });
 
 // ==========================================================================
@@ -86,10 +89,10 @@ function initNavigation() {
 function navigateTo(viewId) {
   const currentUser = db.getCurrentUser();
   if (currentUser && currentUser.perfil === "LIDERANÇA COMUNITÁRIA") {
-    const viewsPermitidas = ["mapa", "estatisticas", "demandas"];
+    const viewsPermitidas = ["mapa", "eleitores", "demandas", "whatsapp", "estatisticas"];
     if (!viewsPermitidas.includes(viewId)) {
-      showToast("🔒 Acesso restrito: seu perfil de Liderança possui acesso exclusivo ao Mapa Territorial, Ranking TSE e Demandas.");
-      viewId = "mapa";
+      showToast("🔒 Acesso restrito: seu perfil de Liderança possui acesso ao Cadastro de Eleitores, Mapa Territorial, Demandas e WhatsApp.");
+      viewId = "eleitores";
     }
   }
 
@@ -285,8 +288,8 @@ function aplicarPermissoesUsuario() {
   const sectionTitles = document.querySelectorAll(".nav-section-title");
 
   if (isLideranca) {
-    // 1. Menu Lateral Restrito: Mapa Territorial, Eleitores, Demandas e Ranking TSE
-    const viewsPermitidas = ["mapa", "eleitores", "demandas", "estatisticas"];
+    // 1. Menu Lateral da Liderança: Cadastro de Eleitores, Disparo WhatsApp, Mapa Territorial, Demandas e Ranking TSE
+    const viewsPermitidas = ["eleitores", "whatsapp", "mapa", "demandas", "estatisticas"];
     
     navItems.forEach(item => {
       const view = item.getAttribute("data-view");
@@ -357,10 +360,9 @@ function openRoleModal() {
       </div>
     `;
     item.addEventListener("click", () => {
-      db.setCurrentUser(u);
-      updateUserBadge();
       closeModal("roleModal");
-      showToast(`Perfil alterado para: ${u.nome}`);
+      if (u.id === currentUser.id) return;
+      abrirTelaLoginComUsuarioPreenchido(u.login || u.email);
     });
     listEl.appendChild(item);
   });
@@ -5401,50 +5403,61 @@ function alternarVisibilidadeSenha(inputId, btnEl) {
   }
 }
 
-// --- TELA DE AUTENTICAÇÃO (LOGIN & CADASTRO RÁPIDO) ---
-function abrirTelaLogin() {
+// --- TELA DE AUTENTICAÇÃO (LOGIN OBRIGATÓRIO & CADASTRO) ---
+function verificarAutenticacaoObrigatoria() {
+  // Limpa autenticação ativa para exigir login e senha a cada entrada/abertura do site
+  sessionStorage.removeItem("RADAR_BACURAU_AUTH_ACTIVE");
+  abrirTelaLogin(true);
+}
+
+function abrirTelaLogin(obrigatorio = true) {
   const overlay = document.getElementById("authScreenOverlay");
+  const btnFechar = document.getElementById("btnFecharAuthModal");
   if (overlay) {
     overlay.style.display = "flex";
-    alternarAbaAuth("login");
-    const input = document.getElementById("authLoginUsuario");
-    if (input) setTimeout(() => input.focus(), 100);
+    if (btnFechar) {
+      btnFechar.style.display = obrigatorio ? "none" : "block";
+    }
+    const inputUser = document.getElementById("authLoginUsuario");
+    const inputPwd = document.getElementById("authLoginSenha");
+    if (inputUser) {
+      inputUser.value = "";
+      setTimeout(() => inputUser.focus(), 150);
+    }
+    if (inputPwd) inputPwd.value = "";
+  }
+}
+
+function abrirTelaLoginComUsuarioPreenchido(loginPreenchido) {
+  abrirTelaLogin(true);
+  const inputUser = document.getElementById("authLoginUsuario");
+  const inputPwd = document.getElementById("authLoginSenha");
+  if (inputUser && loginPreenchido) {
+    inputUser.value = loginPreenchido;
+  }
+  if (inputPwd) {
+    inputPwd.value = "";
+    setTimeout(() => inputPwd.focus(), 180);
   }
 }
 
 function fecharTelaLogin() {
+  const isAuth = sessionStorage.getItem("RADAR_BACURAU_AUTH_ACTIVE") === "true";
+  if (!isAuth) {
+    showToast("🔒 Acesso restrito: informe seu login e sua senha para entrar no Radar Bacurau.");
+    return;
+  }
   const overlay = document.getElementById("authScreenOverlay");
   if (overlay) overlay.style.display = "none";
 }
 
-function alternarAbaAuth(aba) {
-  const btnLogin = document.getElementById("tabBtnLogin");
-  const btnCad = document.getElementById("tabBtnCadastrar");
-  const painelLogin = document.getElementById("authPainelLogin");
-  const painelCad = document.getElementById("authPainelCadastrar");
-
-  if (aba === "login") {
-    if (btnLogin) btnLogin.classList.add("active");
-    if (btnCad) btnCad.classList.remove("active");
-    if (painelLogin) painelLogin.style.display = "block";
-    if (painelCad) painelCad.style.display = "none";
-  } else {
-    if (btnCad) btnCad.classList.add("active");
-    if (btnLogin) btnLogin.classList.remove("active");
-    if (painelCad) painelCad.style.display = "block";
-    if (painelLogin) painelLogin.style.display = "none";
-  }
+function fazerLogout() {
+  sessionStorage.removeItem("RADAR_BACURAU_AUTH_ACTIVE");
+  abrirTelaLogin(true);
+  showToast("🔒 Sessão encerrada com sucesso.");
 }
 
-function preencherCredenciaisRapidas(login, senha) {
-  const inputUser = document.getElementById("authLoginUsuario");
-  const inputPwd = document.getElementById("authLoginSenha");
-  if (inputUser) inputUser.value = login;
-  if (inputPwd) inputPwd.value = senha;
-  showToast(`Credenciais preenchidas: ${login}`);
-}
-
-function executarLogin(event) {
+async function executarLogin(event) {
   if (event) event.preventDefault();
   const loginInput = document.getElementById("authLoginUsuario");
   const senhaInput = document.getElementById("authLoginSenha");
@@ -5452,13 +5465,65 @@ function executarLogin(event) {
   const loginOuEmail = loginInput ? loginInput.value.trim() : "";
   const senha = senhaInput ? senhaInput.value : "";
 
+  if (!loginOuEmail || !senha) {
+    showToast("⚠️ Digite seu login e sua senha.");
+    return;
+  }
+
   try {
-    const user = db.autenticar(loginOuEmail, senha);
-    updateUserBadge();
-    fecharTelaLogin();
-    showToast(`Bem-vindo(a) ao Radar Bacurau, ${user.nome}!`);
+    let user = null;
+    try {
+      user = db.autenticar(loginOuEmail, senha);
+    } catch (errLocal) {
+      // Se não encontrou no banco local e o Supabase estiver conectado, consulta a nuvem em tempo real!
+      if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
+        const q = loginOuEmail.toLowerCase();
+        const { data: usrNuvem, error } = await SupabaseClient.client
+          .from("usuarios")
+          .select("*")
+          .or(`login.eq.${q},email.eq.${q}`)
+          .maybeSingle();
+
+        if (usrNuvem && usrNuvem.senha === senha) {
+          user = usrNuvem;
+          if (!db.data.usuarios) db.data.usuarios = [];
+          const idx = db.data.usuarios.findIndex(u => u.id === user.id || u.login === user.login);
+          if (idx !== -1) {
+            db.data.usuarios[idx] = user;
+          } else {
+            db.data.usuarios.push(user);
+          }
+          db.save();
+        } else {
+          throw errLocal;
+        }
+      } else {
+        throw errLocal;
+      }
+    }
+
+    if (user) {
+      sessionStorage.setItem("RADAR_BACURAU_AUTH_ACTIVE", "true");
+      db.setCurrentUser(user);
+      updateUserBadge();
+
+      const overlay = document.getElementById("authScreenOverlay");
+      if (overlay) overlay.style.display = "none";
+
+      if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
+        SupabaseClient.sincronizarTudo();
+      }
+
+      showToast(`Bem-vindo(a) ao Radar Bacurau, ${user.nome}!`);
+
+      if (user.perfil === "LIDERANÇA COMUNITÁRIA") {
+        navigateTo("eleitores");
+      } else {
+        navigateTo("dashboard");
+      }
+    }
   } catch (err) {
-    showToast(err.message);
+    showToast("❌ " + err.message);
   }
 }
 
@@ -5691,6 +5756,18 @@ function initModalListeners() {
         }
       }
     });
+  });
+
+  // Previne que ESC feche a tela de autenticação obrigatória se não estiver logado
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const isAuth = sessionStorage.getItem("RADAR_BACURAU_AUTH_ACTIVE") === "true";
+      const overlay = document.getElementById("authScreenOverlay");
+      if (!isAuth && overlay && overlay.style.display !== "none") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }
   });
 
   // Drag & drop para anexo de fotos e vídeos na demanda

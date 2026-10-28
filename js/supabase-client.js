@@ -6,6 +6,8 @@
 
 const SupabaseClient = {
   STORAGE_CONFIG_KEY: "RADAR_BACURAU_SUPABASE_CONFIG_V1",
+  DEFAULT_URL: "https://vbkejekvncajbdligqfe.supabase.co",
+  DEFAULT_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZia2VqZWt2bmNhamJkbGlncWZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxNTAxOTgsImV4cCI6MjEwODcyNjE5OH0.sKWcNSlnO7E1CMhunTsgI4maAPNBHbObkwqpZRlQCt0",
   client: null,
   isSyncing: false,
   realtimeChannel: null,
@@ -13,17 +15,35 @@ const SupabaseClient = {
   getConfig() {
     try {
       const saved = localStorage.getItem(this.STORAGE_CONFIG_KEY);
-      return saved ? JSON.parse(saved) : { url: "", anonKey: "", enabled: false };
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (!parsed.url) parsed.url = this.DEFAULT_URL;
+        if (!parsed.anonKey || parsed.anonKey.length < 50) parsed.anonKey = this.DEFAULT_ANON_KEY;
+        parsed.enabled = true;
+        return parsed;
+      }
+      return { url: this.DEFAULT_URL, anonKey: this.DEFAULT_ANON_KEY, enabled: true };
     } catch (e) {
-      return { url: "", anonKey: "", enabled: false };
+      return { url: this.DEFAULT_URL, anonKey: this.DEFAULT_ANON_KEY, enabled: true };
     }
   },
 
+  sanitizarUrl(rawUrl) {
+    if (!rawUrl) return "";
+    let url = String(rawUrl).trim();
+    // Remove caminhos internos do Supabase colados por engano como /rest/v1 ou barras extras
+    url = url.replace(/\/rest\/v1\/?$/i, "");
+    url = url.replace(/\/auth\/v1\/?$/i, "");
+    url = url.replace(/\/+$/, "");
+    return url;
+  },
+
   saveConfig(url, anonKey, enabled = true) {
+    const limpaUrl = this.sanitizarUrl(url);
     const config = {
-      url: (url || "").trim(),
+      url: limpaUrl,
       anonKey: (anonKey || "").trim(),
-      enabled: Boolean(enabled && url && anonKey)
+      enabled: Boolean(enabled && limpaUrl && anonKey)
     };
     localStorage.setItem(this.STORAGE_CONFIG_KEY, JSON.stringify(config));
     this.init();
@@ -85,12 +105,13 @@ const SupabaseClient = {
     }
   },
 
-  async testarConexao(url, anonKey) {
+  async testarConexao(rawUrl, anonKey) {
     if (typeof supabase === "undefined" || !supabase.createClient) {
       return { ok: false, error: "Biblioteca Supabase não carregada." };
     }
     try {
-      const testClient = supabase.createClient(url, anonKey);
+      const url = this.sanitizarUrl(rawUrl);
+      const testClient = supabase.createClient(url, (anonKey || "").trim());
       // Tenta uma consulta rápida na tabela de eleitores ou lideranças
       const { data, error } = await testClient.from("eleitores").select("id").limit(1);
       if (error && error.code !== "PGRST116") {
@@ -155,6 +176,20 @@ const SupabaseClient = {
         });
       }
 
+      // 4. Puxar Usuários, Logins e Senhas da Nuvem
+      const { data: usrNuvem, error: errUsr } = await this.client.from("usuarios").select("*");
+      if (!errUsr && Array.isArray(usrNuvem) && usrNuvem.length > 0) {
+        if (!db.data.usuarios) db.data.usuarios = [];
+        usrNuvem.forEach(uNuvem => {
+          const idx = db.data.usuarios.findIndex(u => u.id === uNuvem.id || (u.login && u.login.toLowerCase() === (uNuvem.login || "").toLowerCase()));
+          if (idx !== -1) {
+            db.data.usuarios[idx] = { ...db.data.usuarios[idx], ...uNuvem };
+          } else {
+            db.data.usuarios.push(uNuvem);
+          }
+        });
+      }
+
       db.save();
       if (typeof updateSidebarCounters === "function") updateSidebarCounters();
       
@@ -163,11 +198,12 @@ const SupabaseClient = {
         if (AppState.currentView === "eleitores" && typeof renderEleitores === "function") renderEleitores();
         if (AppState.currentView === "liderancas" && typeof renderLiderancas === "function") renderLiderancas();
         if (AppState.currentView === "demandas" && typeof renderDemandas === "function") renderDemandas();
+        if (AppState.currentView === "configuracoes" && typeof renderUsuariosConfig === "function") renderUsuariosConfig();
         if (AppState.currentView === "whatsapp" && typeof WhatsAppDispatcher !== "undefined") {
           WhatsAppDispatcher.aplicarFiltrosInterface();
         }
       }
-      console.log("☁️ [Supabase] Sincronização concluída com sucesso!");
+      console.log("☁️ [Supabase] Sincronização concluída com sucesso (eleitores, lideranças, demandas e usuários)!");
     } catch (e) {
       console.warn("Aviso na sincronização Supabase:", e);
     } finally {
@@ -196,9 +232,13 @@ const SupabaseClient = {
       if (demandas.length > 0) {
         await this.client.from("demandas").upsert(demandas);
       }
+      const usuarios = db.getUsuarios() || [];
+      if (usuarios.length > 0) {
+        await this.client.from("usuarios").upsert(usuarios);
+      }
 
       if (typeof showToast === "function") {
-        showToast("☁️ Todos os dados locais foram enviados com sucesso para o Supabase!");
+        showToast("☁️ Todos os dados locais (eleitores, lideranças, demandas e usuários/senhas) foram enviados para o Supabase!");
       }
     } catch (e) {
       console.error("Erro ao subir dados locais para nuvem:", e);
@@ -250,6 +290,38 @@ const SupabaseClient = {
           }
           db.save();
           if (typeof renderLiderancas === "function" && AppState.currentView === "liderancas") renderLiderancas();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "usuarios" }, payload => {
+          console.log("⚡ [Realtime] Mudança em Usuários/Logins recebida da nuvem:", payload);
+          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+            const idx = (db.data.usuarios || []).findIndex(u => u.id === payload.new.id || u.login === payload.new.login);
+            if (idx !== -1) {
+              db.data.usuarios[idx] = payload.new;
+            } else {
+              if (!db.data.usuarios) db.data.usuarios = [];
+              db.data.usuarios.push(payload.new);
+            }
+          } else if (payload.eventType === "DELETE") {
+            db.data.usuarios = (db.data.usuarios || []).filter(u => u.id !== payload.old.id);
+          }
+          db.save();
+          if (typeof renderUsuariosConfig === "function" && AppState.currentView === "configuracoes") renderUsuariosConfig();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "demandas" }, payload => {
+          console.log("⚡ [Realtime] Mudança em Demandas recebida da nuvem:", payload);
+          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+            const idx = (db.data.demandas || []).findIndex(d => d.id === payload.new.id);
+            if (idx !== -1) {
+              db.data.demandas[idx] = payload.new;
+            } else {
+              if (!db.data.demandas) db.data.demandas = [];
+              db.data.demandas.unshift(payload.new);
+            }
+          } else if (payload.eventType === "DELETE") {
+            db.data.demandas = (db.data.demandas || []).filter(d => d.id !== payload.old.id);
+          }
+          db.save();
+          if (typeof renderDemandas === "function" && AppState.currentView === "demandas") renderDemandas();
         })
         .subscribe();
     } catch (e) {
@@ -310,13 +382,35 @@ const SupabaseClient = {
     } catch (e) {
       console.error("Erro ao excluir demanda no Supabase:", e);
     }
+  },
+
+  async salvarUsuarioNuvem(usuario) {
+    if (!this.isConnected() || !usuario) return;
+    try {
+      await this.client.from("usuarios").upsert([usuario]);
+    } catch (e) {
+      console.error("Erro ao salvar usuário no Supabase:", e);
+    }
+  },
+
+  async excluirUsuarioNuvem(usuarioId) {
+    if (!this.isConnected() || !usuarioId) return;
+    try {
+      await this.client.from("usuarios").delete().eq("id", usuarioId);
+    } catch (e) {
+      console.error("Erro ao excluir usuário no Supabase:", e);
+    }
   }
 };
 
 // Funções de Interface do Painel de Configurações
 async function salvarConfiguracaoSupabase() {
-  const url = document.getElementById("cfgSupabaseUrl")?.value || "";
-  const key = document.getElementById("cfgSupabaseKey")?.value || "";
+  const inputUrl = document.getElementById("cfgSupabaseUrl");
+  const rawUrl = inputUrl?.value || "";
+  const key = (document.getElementById("cfgSupabaseKey")?.value || "").trim();
+
+  const url = SupabaseClient.sanitizarUrl(rawUrl);
+  if (inputUrl) inputUrl.value = url;
 
   if (!url || !key) {
     if (typeof showToast === "function") showToast("⚠️ Preencha a Project URL e a Anon Key do Supabase.");
@@ -357,7 +451,7 @@ function desconectarSupabase() {
   }
 }
 
-// Inicializa automaticamente quando o script carregar
+// Inicializa e sincroniza automaticamente quando o script carregar
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     SupabaseClient.init();
@@ -368,4 +462,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (inputUrl && cfg.url) inputUrl.value = cfg.url;
     if (inputKey && cfg.anonKey) inputKey.value = cfg.anonKey;
   }, 300);
+
+  // Sincronização Automática Silenciosa a cada 60 segundos
+  setInterval(() => {
+    if (SupabaseClient.isConnected() && !document.hidden) {
+      SupabaseClient.sincronizarTudo();
+    }
+  }, 60000);
+
+  // Sincronização Automática ao voltar para a aba do navegador
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && SupabaseClient.isConnected()) {
+      SupabaseClient.sincronizarTudo();
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    if (SupabaseClient.isConnected()) {
+      SupabaseClient.sincronizarTudo();
+    }
+  });
 });

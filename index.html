@@ -24,8 +24,13 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- SDK Oficial Supabase (Nuvem em Tempo Real) -->
+  <!-- SDK Oficial Supabase (Nuvem em Tempo Real) com Fallback Anti-Bloqueio -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    if (typeof supabase === 'undefined') {
+      document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
+    }
+  </script>
 </head>
 <body>
 
@@ -140,7 +145,7 @@
           <div class="user-name" id="currentUserName">ADMINISTRADOR</div>
           <div class="user-role" id="currentUserRole">ADMINISTRADOR MASTER</div>
         </div>
-        <button type="button" class="btn-icon" onclick="abrirTelaLogin()" style="margin-left:auto; font-size:1.1rem; padding:4px;" title="Bloquear / Trocar de Usuário (Login)">
+        <button type="button" class="btn-icon" onclick="fazerLogout()" style="margin-left:auto; font-size:1.1rem; padding:4px;" title="Sair do Sistema (Bloquear)">
           🚪
         </button>
       </div>
@@ -1810,7 +1815,7 @@
             <span style="font-size:1.25rem;">🔑</span>
             <div>
               <strong style="color:var(--emerald-400); font-size:0.9rem; display:block;">Credenciais de Acesso da Liderança (Login & Senha)</strong>
-              <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Com este acesso, a liderança vê exclusivamente o <strong>Mapa</strong> do seu local determinado (sem outros perímetros), o <strong>Ranking TSE</strong> e as <strong>Demandas</strong>.</span>
+              <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Com este acesso, a liderança cadastra e gerencia com exclusividade os <strong>Eleitores</strong> da sua base, envia <strong>WhatsApp</strong>, consulta o <strong>Mapa</strong> e atende <strong>Demandas</strong>.</span>
             </div>
           </div>
           <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
@@ -2782,10 +2787,10 @@
   </div>
 </div>
 
-<!-- Tela de Autenticação / Login e Cadastro de Senha -->
-<div class="auth-screen-overlay" id="authScreenOverlay" style="display:none;">
+<!-- Tela de Autenticação / Login Obrigatório -->
+<div class="auth-screen-overlay" id="authScreenOverlay" style="display:flex;">
   <div class="auth-card">
-    <button type="button" class="modal-close" onclick="fecharTelaLogin()" style="position:absolute; top:12px; right:16px; font-size:1.3rem; z-index:10;" title="Fechar">&times;</button>
+    <button type="button" class="modal-close" id="btnFecharAuthModal" onclick="fecharTelaLogin()" style="position:absolute; top:12px; right:16px; font-size:1.3rem; z-index:10; display:none;" title="Fechar">&times;</button>
     <div class="auth-header">
       <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="auth-logo">
       <div class="auth-title">Acesso Seguro ao Radar Bacurau</div>
