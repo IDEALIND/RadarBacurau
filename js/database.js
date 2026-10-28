@@ -1241,6 +1241,9 @@ class RadarBacurauDB {
     if (!Array.isArray(item.anexos)) item.anexos = [];
     item.anexos.push(anexo);
     this.save();
+    if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
+      SupabaseClient.salvarDemandaNuvem(item);
+    }
     this.logAuditoria("Anexo de Mídia", "Demandas", `Adicionada mídia "${anexo.nome}" (${anexo.tipo}) na demanda "${item.titulo}".`);
     return true;
   }

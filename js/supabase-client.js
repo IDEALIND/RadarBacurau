@@ -167,6 +167,12 @@ const SupabaseClient = {
       if (!errDem && Array.isArray(demNuvem) && demNuvem.length > 0) {
         if (!db.data.demandas) db.data.demandas = [];
         demNuvem.forEach(dNuvem => {
+          if (!dNuvem.anexos && dNuvem.midias) dNuvem.anexos = dNuvem.midias;
+          if (!dNuvem.midias && dNuvem.anexos) dNuvem.midias = dNuvem.anexos;
+          if (!dNuvem.bairroNome && dNuvem.bairro) dNuvem.bairroNome = dNuvem.bairro;
+          if (!dNuvem.liderancaNome && dNuvem.lideranca) dNuvem.liderancaNome = dNuvem.lideranca;
+          if (!dNuvem.telefone && dNuvem.contatoSolicitante) dNuvem.telefone = dNuvem.contatoSolicitante;
+          if (!dNuvem.dataPrevisao && dNuvem.previsao) dNuvem.dataPrevisao = dNuvem.previsao;
           const idx = db.data.demandas.findIndex(d => d.id === dNuvem.id);
           if (idx !== -1) {
             db.data.demandas[idx] = { ...db.data.demandas[idx], ...dNuvem };
@@ -310,12 +316,20 @@ const SupabaseClient = {
         .on("postgres_changes", { event: "*", schema: "public", table: "demandas" }, payload => {
           console.log("⚡ [Realtime] Mudança em Demandas recebida da nuvem:", payload);
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-            const idx = (db.data.demandas || []).findIndex(d => d.id === payload.new.id);
+            const dNuvem = payload.new;
+            if (!dNuvem.anexos && dNuvem.midias) dNuvem.anexos = dNuvem.midias;
+            if (!dNuvem.midias && dNuvem.anexos) dNuvem.midias = dNuvem.anexos;
+            if (!dNuvem.bairroNome && dNuvem.bairro) dNuvem.bairroNome = dNuvem.bairro;
+            if (!dNuvem.liderancaNome && dNuvem.lideranca) dNuvem.liderancaNome = dNuvem.lideranca;
+            if (!dNuvem.telefone && dNuvem.contatoSolicitante) dNuvem.telefone = dNuvem.contatoSolicitante;
+            if (!dNuvem.dataPrevisao && dNuvem.previsao) dNuvem.dataPrevisao = dNuvem.previsao;
+
+            const idx = (db.data.demandas || []).findIndex(d => d.id === dNuvem.id);
             if (idx !== -1) {
-              db.data.demandas[idx] = payload.new;
+              db.data.demandas[idx] = { ...db.data.demandas[idx], ...dNuvem };
             } else {
               if (!db.data.demandas) db.data.demandas = [];
-              db.data.demandas.unshift(payload.new);
+              db.data.demandas.unshift(dNuvem);
             }
           } else if (payload.eventType === "DELETE") {
             db.data.demandas = (db.data.demandas || []).filter(d => d.id !== payload.old.id);
@@ -369,7 +383,26 @@ const SupabaseClient = {
   async salvarDemandaNuvem(demanda) {
     if (!this.isConnected() || !demanda) return;
     try {
-      await this.client.from("demandas").upsert([demanda]);
+      const midiasList = demanda.anexos || demanda.midias || [];
+      const payload = {
+        id: demanda.id,
+        titulo: demanda.titulo,
+        descricao: demanda.descricao || "",
+        categoria: demanda.categoria || "Geral",
+        prioridade: demanda.prioridade || "Média",
+        status: demanda.status || "Pendente",
+        bairro: demanda.bairroNome || demanda.bairro || "",
+        comunidadeId: demanda.bairroComunidadeId || demanda.comunidadeId || "",
+        lideranca: demanda.liderancaNome || demanda.lideranca || "",
+        solicitante: demanda.solicitante || "",
+        contatoSolicitante: demanda.telefone || demanda.contatoSolicitante || "",
+        dataAbertura: demanda.dataAbertura || demanda.dataCadastro || new Date().toLocaleDateString("pt-BR"),
+        previsao: demanda.dataPrevisao || demanda.previsao || "",
+        dataConclusao: demanda.dataConclusao || "",
+        midias: midiasList,
+        historico: demanda.historico || []
+      };
+      await this.client.from("demandas").upsert([payload]);
     } catch (e) {
       console.error("Erro ao salvar demanda no Supabase:", e);
     }

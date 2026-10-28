@@ -156,6 +156,25 @@
        MAIN WRAPPER & TOPBAR
        ======================================================================== -->
   <div class="main-wrapper">
+    <!-- Header Mobile Exclusivo para Lideranças -->
+    <header class="mobile-lideranca-top-header" id="mobileLiderancaTopHeader" style="display:none;">
+      <div class="mobile-lideranca-brand">
+        <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="mobile-lideranca-logo">
+        <div>
+          <div class="mobile-lideranca-title">RADAR BACURAU</div>
+          <div class="mobile-lideranca-sub" id="mobileLiderancaNomeSub">Painel da Liderança</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="supabase-status-indicator online" style="font-size:0.75rem; padding:4px 8px;">
+          🟢 Nuvem
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="fazerLogout()" style="padding:4px 10px; font-size:0.8rem; border-color:rgba(239,68,68,0.4); color:#ef4444;">
+          Sair 🚪
+        </button>
+      </div>
+    </header>
+
     <header class="topbar">
       <div class="topbar-left">
         <button class="mobile-toggle" id="mobileToggle" aria-label="Abrir menu">☰</button>
@@ -673,6 +692,30 @@
 
         <!-- Tabela Nominal e Ações de Eleitores -->
         <div class="card-section">
+          <!-- Card de Ação Rápida Mobile para Lideranças -->
+          <div class="mobile-lideranca-quick-action" id="mobileLiderancaQuickAction" style="display:none;">
+            <button type="button" class="mobile-btn-cadastrar" onclick="abrirModalNovoEleitor()">
+              <span style="font-size:1.4rem;">➕</span>
+              <span>CADASTRAR NOVO ELEITOR</span>
+            </button>
+            <div class="mobile-lideranca-stats-bar">
+              <div class="mobile-stat-box">
+                <span class="mobile-stat-num" id="mobileStatMeusEleitores">0</span>
+                <span class="mobile-stat-lbl">Meus Eleitores</span>
+              </div>
+              <div class="mobile-stat-box">
+                <span class="mobile-stat-num" id="mobileStatComFoto">0</span>
+                <span class="mobile-stat-lbl">Com Título Foto</span>
+              </div>
+              <div class="mobile-stat-box" style="padding:4px;">
+                <button type="button" class="btn btn-sm" onclick="iniciarDisparoEmMassaEleitores()" style="background:#25D366; color:#000; font-weight:700; width:100%; height:100%; border:none; font-size:0.75rem; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">
+                  <span style="font-size:1.1rem;">💬</span>
+                  <span>WhatsApp</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="section-header">
             <div class="section-title-wrap">
               <h3>👥 Base Nominal de Eleitores Cadastrados</h3>
@@ -739,6 +782,9 @@
               <tbody id="eleitoresTableBody"></tbody>
             </table>
           </div>
+
+          <!-- Lista de Eleitores em Cards (Modo Mobile Exclusivo para Liderança) -->
+          <div class="eleitores-mobile-cards-list" id="eleitoresMobileCardsList" style="display:none;"></div>
         </div>
       </section>
 
@@ -2821,6 +2867,30 @@
     </div>
   </div>
 </div>
+
+<!-- Barra de Navegação Inferior Exclusiva para Lideranças (Mobile App Bar) -->
+<nav class="mobile-lideranca-bottom-nav" id="mobileLiderancaBottomNav" style="display:none;">
+  <button type="button" class="mobile-nav-btn active" data-view="eleitores" onclick="navigateTo('eleitores')">
+    <span class="mobile-nav-icon">👥</span>
+    <span class="mobile-nav-label">Eleitores</span>
+  </button>
+  <button type="button" class="mobile-nav-btn" data-view="whatsapp" onclick="navigateTo('whatsapp')">
+    <span class="mobile-nav-icon">💬</span>
+    <span class="mobile-nav-label">WhatsApp</span>
+  </button>
+  <button type="button" class="mobile-nav-btn" data-view="demandas" onclick="navigateTo('demandas')">
+    <span class="mobile-nav-icon">📋</span>
+    <span class="mobile-nav-label">Demandas</span>
+  </button>
+  <button type="button" class="mobile-nav-btn" data-view="mapa" onclick="navigateTo('mapa')">
+    <span class="mobile-nav-icon">🗺️</span>
+    <span class="mobile-nav-label">Meu Bairro</span>
+  </button>
+  <button type="button" class="mobile-nav-btn" onclick="fazerLogout()" style="color:#ef4444;">
+    <span class="mobile-nav-icon">🚪</span>
+    <span class="mobile-nav-label">Sair</span>
+  </button>
+</nav>
 
 <!-- Container de Notificações Toast -->
 <div class="toast-container" id="toastContainer"></div>

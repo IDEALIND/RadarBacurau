@@ -106,6 +106,15 @@ function navigateTo(viewId) {
     }
   });
 
+  // Atualiza botões da barra inferior mobile da liderança
+  document.querySelectorAll(".mobile-nav-btn").forEach(btn => {
+    if (btn.getAttribute("data-view") === viewId) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
   const sidebar = document.getElementById("sidebar");
   if (sidebar) sidebar.classList.remove("mobile-open");
 
@@ -286,44 +295,58 @@ function aplicarPermissoesUsuario() {
 
   const navItems = document.querySelectorAll(".nav-item");
   const sectionTitles = document.querySelectorAll(".nav-section-title");
+  const mobileTopHeader = document.getElementById("mobileLiderancaTopHeader");
+  const mobileBottomNav = document.getElementById("mobileLiderancaBottomNav");
+  const mobileQuickAction = document.getElementById("mobileLiderancaQuickAction");
+  const mobileCardsList = document.getElementById("eleitoresMobileCardsList");
+  const desktopTableWrap = document.getElementById("eleitoresTableResponsive");
+  const desktopScrollBanner = document.querySelector(".table-scroll-banner");
+  const eleitorBreakdownGrid = document.querySelector(".eleitor-breakdown-grid");
 
   if (isLideranca) {
-    // 1. Menu Lateral da Liderança: Cadastro de Eleitores, Disparo WhatsApp, Mapa Territorial, Demandas e Ranking TSE
-    const viewsPermitidas = ["eleitores", "whatsapp", "mapa", "demandas", "estatisticas"];
-    
-    navItems.forEach(item => {
-      const view = item.getAttribute("data-view");
-      if (viewsPermitidas.includes(view)) {
-        item.style.display = "flex";
-      } else {
-        item.style.display = "none";
-      }
-    });
+    document.body.classList.add("modo-lideranca-mobile");
 
-    sectionTitles.forEach(st => {
-      st.style.display = "none";
-    });
-
-    // 2. Se estiver em uma tela proibida (ex: dashboard), redireciona imediatamente para o mapa
-    if (!viewsPermitidas.includes(AppState.currentView)) {
-      navigateTo("mapa");
+    // 1. Exibe Header Mobile e Barra Inferior de Navegação Estilo App Nativo
+    if (mobileBottomNav) mobileBottomNav.style.display = "flex";
+    if (mobileTopHeader) {
+      mobileTopHeader.style.display = "flex";
+      const sub = document.getElementById("mobileLiderancaNomeSub");
+      if (sub) sub.innerHTML = `Líder: <strong style="color:var(--emerald-400);">${currentUser.nome}</strong>`;
     }
 
-    // 3. Controles do Mapa: Oculta botões administrativos de alteração cartográfica
+    // 2. Na view de Eleitores: ativa cards mobile e oculta tabela desktop larga
+    if (mobileQuickAction) mobileQuickAction.style.display = "block";
+    if (mobileCardsList) mobileCardsList.style.display = "flex";
+    if (desktopTableWrap) desktopTableWrap.style.display = "none";
+    if (desktopScrollBanner) desktopScrollBanner.style.display = "none";
+    if (eleitorBreakdownGrid) eleitorBreakdownGrid.style.display = "none";
+
+    // 3. Views da Liderança: prioriza Cadastro de Eleitores
+    const viewsPermitidas = ["eleitores", "whatsapp", "demandas", "mapa"];
+    if (!viewsPermitidas.includes(AppState.currentView) || AppState.currentView === "dashboard") {
+      navigateTo("eleitores");
+    }
+
+    // 4. Controles do Mapa: Oculta botões administrativos de alteração cartográfica
     const btnNovoCom = document.querySelector("#view-mapa button[onclick='abrirModalNovaComunidade()']");
     const btnEditPer = document.getElementById("btnEditarPerimetro");
     if (btnNovoCom) btnNovoCom.style.display = "none";
     if (btnEditPer) btnEditPer.style.display = "none";
 
   } else {
-    // Administrador Master ou outros perfis com acesso amplo
-    navItems.forEach(item => {
-      item.style.display = "flex";
-    });
+    document.body.classList.remove("modo-lideranca-mobile");
 
-    sectionTitles.forEach(st => {
-      st.style.display = "block";
-    });
+    // Restaura layout desktop completo para Administrador Master
+    if (mobileBottomNav) mobileBottomNav.style.display = "none";
+    if (mobileTopHeader) mobileTopHeader.style.display = "none";
+    if (mobileQuickAction) mobileQuickAction.style.display = "none";
+    if (mobileCardsList) mobileCardsList.style.display = "none";
+    if (desktopTableWrap) desktopTableWrap.style.display = "";
+    if (desktopScrollBanner) desktopScrollBanner.style.display = "";
+    if (eleitorBreakdownGrid) eleitorBreakdownGrid.style.display = "";
+
+    navItems.forEach(item => { item.style.display = "flex"; });
+    sectionTitles.forEach(st => { st.style.display = "block"; });
 
     const btnNovoCom = document.querySelector("#view-mapa button[onclick='abrirModalNovaComunidade()']");
     const btnEditPer = document.getElementById("btnEditarPerimetro");
@@ -2572,6 +2595,74 @@ function renderEleitores() {
       </tr>
     `;
   }).join("");
+
+  // Renderiza a visualização em Cards Mobile para Lideranças
+  const mobileCardsContainer = document.getElementById("eleitoresMobileCardsList");
+  if (mobileCardsContainer) {
+    const statMeusEleitores = document.getElementById("mobileStatMeusEleitores");
+    const statComFoto = document.getElementById("mobileStatComFoto");
+    if (statMeusEleitores) statMeusEleitores.textContent = estatisticas.total;
+    if (statComFoto) statComFoto.textContent = estatisticas.totalComFoto;
+
+    if (lista.length === 0) {
+      mobileCardsContainer.innerHTML = `
+        <div class="mobile-card-empty">
+          <div style="font-size:2.5rem; margin-bottom:8px;">👥</div>
+          <h4 style="color:#ffffff; margin:0 0 4px; font-weight:700;">Nenhum eleitor localizado</h4>
+          <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 16px;">Cadastre seu primeiro eleitor com um toque no botão abaixo.</p>
+          <button type="button" class="btn btn-gold" onclick="abrirModalNovoEleitor()" style="padding:12px 24px; font-weight:800; border-radius:10px;">➕ Cadastrar Eleitor</button>
+        </div>
+      `;
+    } else {
+      mobileCardsContainer.innerHTML = lista.map(e => {
+        const temFoto = e.fotoTitulo && e.fotoTitulo.trim() !== "";
+        const telSanitizado = e.telefone ? e.telefone.replace(/\D/g, "") : "";
+        const linkWpp = telSanitizado ? `https://api.whatsapp.com/send?phone=55${telSanitizado.replace(/^55/, "")}` : null;
+        const fotoHtml = temFoto
+          ? `<img src="${e.fotoTitulo}" alt="Foto Título">`
+          : `<span>📷</span>`;
+
+        return `
+          <div class="eleitor-mobile-card">
+            <div class="eleitor-mobile-card-top">
+              <div class="eleitor-mobile-avatar" onclick="${temFoto ? `abrirFotoTituloModal('${e.id}')` : `editarEleitor('${e.id}')`}" title="${temFoto ? 'Ver foto do título' : 'Anexar foto'}">
+                ${fotoHtml}
+              </div>
+              <div class="eleitor-mobile-info">
+                <div class="eleitor-mobile-name">${e.nome}</div>
+                <div class="eleitor-mobile-endereco">
+                  📍 ${e.rua ? `${e.rua}, Nº ${e.numero || 'S/N'}` : (e.endereco || 'Endereço não informado')}
+                </div>
+                <div class="eleitor-mobile-badges">
+                  <span class="badge-bairro">📍 ${e.bairroNome || '-'}</span>
+                  <span class="badge-secao">Seção ${e.secao || '-'}</span>
+                  ${temFoto ? '<span class="badge-doc">🪪 Título Foto</span>' : ''}
+                </div>
+              </div>
+            </div>
+
+            <div class="eleitor-mobile-card-actions">
+              ${linkWpp ? `
+                <a href="${linkWpp}" target="_blank" class="mobile-card-btn btn-whatsapp" title="Conversar no WhatsApp">
+                  <span>💬</span> WhatsApp
+                </a>
+              ` : `
+                <button type="button" class="mobile-card-btn btn-sem-tel" onclick="editarEleitor('${e.id}')">
+                  <span>➕</span> Add Tel
+                </button>
+              `}
+              <button type="button" class="mobile-card-btn btn-edit" onclick="editarEleitor('${e.id}')" title="Editar">
+                ✏️ Editar
+              </button>
+              <button type="button" class="mobile-card-btn btn-del" onclick="excluirEleitor('${e.id}')" title="Excluir">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+  }
 
   updateSidebarCounters();
 }
