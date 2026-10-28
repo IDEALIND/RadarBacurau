@@ -104,7 +104,7 @@ class RadarBacurauDB {
             return login !== "alter" && nome !== "altemar gabriel";
           });
         }
-
+        this.sincronizarLiderancasComBairros();
         this.save();
       } else {
         this.resetToSeed();
@@ -450,6 +450,122 @@ class RadarBacurauDB {
     return comunidadeData;
   }
 
+  sincronizarLiderancasComBairros() {
+    if (!this.data) return;
+    if (!this.data.comunidades) this.data.comunidades = [];
+    if (!this.data.liderancas) this.data.liderancas = [];
+    if (!this.data.usuarios) this.data.usuarios = [];
+
+    let alterado = false;
+
+    // 1. Sincroniza da lista de Lideranças para as Comunidades
+    this.data.liderancas.forEach(lid => {
+      if (!lid || !lid.nome) return;
+      const vinculadas = Array.isArray(lid.comunidadesVinculadas) ? lid.comunidadesVinculadas : [];
+      vinculadas.forEach(comId => {
+        const com = this.getComunidadeById(comId);
+        if (com) {
+          if (com.liderancaNome !== lid.nome || com.liderancaResponsavelId !== lid.id) {
+            com.liderancaNome = lid.nome;
+            com.liderancaResponsavelId = lid.id;
+            if (lid.telefone) com.liderancaContato = lid.telefone;
+            alterado = true;
+          }
+        }
+      });
+    });
+
+    // 2. Sincroniza das Comunidades para a lista de Lideranças
+    this.data.comunidades.forEach(com => {
+      const nomeLid = (com.liderancaNome || "").trim();
+      if (!nomeLid) return;
+
+      let lid = this.data.liderancas.find(l => 
+        (com.liderancaResponsavelId && l.id === com.liderancaResponsavelId) ||
+        (l.nome && l.nome.toLowerCase().trim() === nomeLid.toLowerCase())
+      );
+
+      if (lid) {
+        if (com.liderancaResponsavelId !== lid.id) {
+          com.liderancaResponsavelId = lid.id;
+          alterado = true;
+        }
+        if (!Array.isArray(lid.comunidadesVinculadas)) lid.comunidadesVinculadas = [];
+        if (!lid.comunidadesVinculadas.includes(com.id)) {
+          lid.comunidadesVinculadas.push(com.id);
+          alterado = true;
+        }
+      } else {
+        const novoLid = {
+          id: "lid-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
+          nome: nomeLid,
+          apelido: "",
+          telefone: com.liderancaContato || "",
+          cargoPapel: "Líder de Bairro / Localidade",
+          comunidadesVinculadas: [com.id],
+          status: "Ativo",
+          dataInicio: new Date().toISOString().split("T")[0],
+          votosTotaisConseguidos: Number(com.votosConseguidos) || 0,
+          observacoes: com.observacoes || ""
+        };
+        this.data.liderancas.push(novoLid);
+        com.liderancaResponsavelId = novoLid.id;
+        alterado = true;
+
+        if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
+          SupabaseClient.salvarLiderancaNuvem(novoLid);
+        }
+      }
+    });
+
+    // 3. Sincroniza Usuários com perfil 'LIDERANÇA COMUNITÁRIA'
+    this.data.usuarios.forEach(u => {
+      if (u.perfil === "LIDERANÇA COMUNITÁRIA") {
+        let lid = this.data.liderancas.find(l => 
+          (u.liderancaId && l.id === u.liderancaId) || 
+          (l.login && l.login.toLowerCase() === (u.login || "").toLowerCase()) ||
+          (l.nome && l.nome.toLowerCase().trim() === (u.nome || "").toLowerCase().trim())
+        );
+        if (!lid) {
+          lid = {
+            id: u.liderancaId || ("lid-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4)),
+            nome: u.nome,
+            apelido: "",
+            telefone: u.telefone || "",
+            cargoPapel: "Líder Comunitário",
+            comunidadesVinculadas: Array.isArray(u.comunidadesVinculadas) ? u.comunidadesVinculadas : (u.comunidadeId ? [u.comunidadeId] : []),
+            login: u.login,
+            senha: u.senha,
+            status: u.status || "Ativo",
+            dataInicio: new Date().toISOString().split("T")[0],
+            votosTotaisConseguidos: 0,
+            observacoes: ""
+          };
+          u.liderancaId = lid.id;
+          this.data.liderancas.push(lid);
+          alterado = true;
+          if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
+            SupabaseClient.salvarLiderancaNuvem(lid);
+          }
+        }
+        
+        const vincs = Array.isArray(u.comunidadesVinculadas) ? u.comunidadesVinculadas : (u.comunidadeId ? [u.comunidadeId] : []);
+        vincs.forEach(cid => {
+          const c = this.getComunidadeById(cid);
+          if (c && (!c.liderancaNome || c.liderancaNome !== u.nome)) {
+            c.liderancaNome = u.nome;
+            c.liderancaResponsavelId = lid ? lid.id : u.id;
+            alterado = true;
+          }
+        });
+      }
+    });
+
+    if (alterado) {
+      this.save();
+    }
+  }
+
   atribuirLiderancaAoBairro(comunidadeId, nomeLideranca, votosConseguidos, metaVotos = null, contato = "", obs = "") {
     const com = this.getComunidadeById(comunidadeId);
     if (!com) return null;
@@ -467,8 +583,12 @@ class RadarBacurauDB {
 
     if (contato) com.liderancaContato = contato;
 
+    let lidSalvo = null;
     if (nomeLideranca) {
-      let lid = (this.data.liderancas || []).find(l => l.nome.toLowerCase() === nomeLideranca.toLowerCase());
+      let lid = (this.data.liderancas || []).find(l => 
+        (com.liderancaResponsavelId && l.id === com.liderancaResponsavelId) ||
+        (l.nome && l.nome.toLowerCase().trim() === nomeLideranca.toLowerCase())
+      );
       if (!lid) {
         lid = {
           id: "lid-" + Date.now(),
@@ -483,19 +603,35 @@ class RadarBacurauDB {
         };
         this.data.liderancas.push(lid);
       } else {
+        if (!Array.isArray(lid.comunidadesVinculadas)) lid.comunidadesVinculadas = [];
         if (!lid.comunidadesVinculadas.includes(comunidadeId)) {
           lid.comunidadesVinculadas.push(comunidadeId);
         }
+        if (contato && !lid.telefone) lid.telefone = contato;
         lid.votosTotaisConseguidos = (lid.votosTotaisConseguidos || 0) + votos;
       }
       com.liderancaResponsavelId = lid.id;
+      lidSalvo = lid;
       this.logAuditoria("Mapeamento Territorial", "Mapa / Bairro", `Bairro "${com.nome}" mapeado com líder "${nomeLideranca}", ${votos} votos e meta de ${com.metaVotos} votos.`);
     } else {
+      if (com.liderancaResponsavelId) {
+        const lidAntigo = (this.data.liderancas || []).find(l => l.id === com.liderancaResponsavelId);
+        if (lidAntigo && Array.isArray(lidAntigo.comunidadesVinculadas)) {
+          lidAntigo.comunidadesVinculadas = lidAntigo.comunidadesVinculadas.filter(id => id !== comunidadeId);
+          lidSalvo = lidAntigo;
+        }
+      }
       com.liderancaResponsavelId = null;
+      com.liderancaNome = null;
       this.logAuditoria("Desvinculação", "Mapa / Bairro", `Liderança removida do bairro "${com.nome}".`);
     }
 
     this.save();
+
+    if (lidSalvo && typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
+      SupabaseClient.salvarLiderancaNuvem(lidSalvo);
+    }
+
     return com;
   }
 
@@ -829,6 +965,7 @@ class RadarBacurauDB {
   }
 
   getDashboardStats() {
+    this.sincronizarLiderancasComBairros();
     const coms = this.data.comunidades || [];
     const lids = this.data.liderancas || [];
     const secs = this.data.secoesEleitorais || [];

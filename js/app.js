@@ -50,6 +50,9 @@ const AppState = {
 
 // Inicialização ao carregar a página
 document.addEventListener("DOMContentLoaded", () => {
+  if (typeof db !== "undefined" && db.sincronizarLiderancasComBairros) {
+    db.sincronizarLiderancasComBairros();
+  }
   initNavigation();
   initTheme();
   initUserSession();
@@ -57,6 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
   // Renderiza a view inicial no Mapa Territorial
   renderView("mapa");
+  updateSidebarCounters();
 
   // Bloqueio de Segurança Obrigatório: exige login e senha a cada entrada no site
   verificarAutenticacaoObrigatoria();
@@ -214,8 +218,9 @@ function updateSidebarCounters() {
   const cWhatsapp = document.getElementById("cnt-whatsapp");
   const cDemandas = document.getElementById("cnt-demandas");
 
+  const totalLids = (db.getLiderancas() || []).length;
   if (cComs) cComs.textContent = stats.totalComunidades;
-  if (cLids) cLids.textContent = stats.bairrosComLideranca;
+  if (cLids) cLids.textContent = Math.max(totalLids, stats.bairrosComLideranca);
   if (cSecs) cSecs.textContent = stats.totalSecoes;
   if (cEleitores) cEleitores.textContent = (db.getEleitores() || []).length;
   if (cWhatsapp && typeof WhatsAppDispatcher !== "undefined") {
@@ -582,8 +587,25 @@ function carregarMarcadoresMapa() {
 
     coordsPoligono.forEach(pt => allLatLngs.push(pt));
 
-    const temLider = Boolean(com.liderancaNome && com.liderancaNome.trim() !== "");
-    const nomeLider = temLider ? com.liderancaNome : "Sem líder atribuído";
+    let nomeLider = (com.liderancaNome || "").trim();
+    let temLider = Boolean(nomeLider !== "");
+
+    if (!temLider) {
+      const lidVinculada = (db.data.liderancas || []).find(l => 
+        (com.liderancaResponsavelId && l.id === com.liderancaResponsavelId) ||
+        (Array.isArray(l.comunidadesVinculadas) && l.comunidadesVinculadas.includes(com.id))
+      );
+      if (lidVinculada && lidVinculada.nome) {
+        com.liderancaNome = lidVinculada.nome;
+        com.liderancaResponsavelId = lidVinculada.id;
+        nomeLider = lidVinculada.nome;
+        temLider = true;
+      }
+    }
+
+    if (!temLider) {
+      nomeLider = "Sem líder atribuído";
+    }
     const votos = Number(com.votosConseguidos) || 0;
     const corTema = getCorPorTipo(com.tipo);
 
@@ -1397,7 +1419,16 @@ function renderTabelaLocalidadesMapa() {
   }
 
   tbody.innerHTML = coms.map(c => {
-    const temLider = Boolean(c.liderancaNome || c.liderancaResponsavelId);
+    let nomeLider = (c.liderancaNome || "").trim();
+    if (!nomeLider && c.liderancaResponsavelId) {
+      const lid = (db.data.liderancas || []).find(l => l.id === c.liderancaResponsavelId);
+      if (lid && lid.nome) nomeLider = lid.nome;
+    }
+    if (!nomeLider) {
+      const lid = (db.data.liderancas || []).find(l => Array.isArray(l.comunidadesVinculadas) && l.comunidadesVinculadas.includes(c.id));
+      if (lid && lid.nome) nomeLider = lid.nome;
+    }
+    const temLider = Boolean(nomeLider !== "");
     const votos = Number(c.votosConseguidos) || 0;
     const meta = Number(c.metaVotos) || Math.max(30, Math.round((c.eleitoresEstimados || 200) * 0.4));
     const pct = meta > 0 ? Math.min(100, Math.round((votos / meta) * 100)) : 0;
@@ -1420,7 +1451,7 @@ function renderTabelaLocalidadesMapa() {
         </td>
         <td>
           ${temLider 
-            ? `<strong style="color:var(--emerald-400);">👤 ${c.liderancaNome}</strong>` 
+            ? `<strong style="color:var(--emerald-400);">👤 ${nomeLider}</strong>` 
             : '<span style="color:var(--status-pendente); font-style:italic;">⚠️ Sem líder</span>'}
         </td>
         <td>
@@ -1472,27 +1503,7 @@ function abrirModalMapearLiderBairro(bairroId = null) {
   const select = document.getElementById("formMapBairroSelect");
   if (!select) return;
 
-  const coms = db.getComunidades();
-  select.innerHTML = '<option value="">-- Selecione o Bairro ou Comunidade --</option>';
-
-  coms.forEach(c => {
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = `${c.nome} (${c.tipo})${c.liderancaNome ? ` — Líder: ${c.liderancaNome} (${c.votosConseguidos || 0} votos)` : ' — [Sem líder]'}`;
-    select.appendChild(opt);
-  });
-
-  const targetId = bairroId || (coms[0] ? coms[0].id : "");
-  select.value = targetId;
-  aoSelecionarBairroNoModal(targetId);
-
-  openModal("modalMapearLiderBairro");
-}
-
-function abrirModalMapearLiderBairro(bairroId = null) {
-  const select = document.getElementById("formMapBairroSelect");
-  if (!select) return;
-
+  db.sincronizarLiderancasComBairros();
   const coms = db.getComunidades();
   select.innerHTML = '<option value="">-- Selecione o Bairro ou Comunidade --</option>';
 
@@ -2031,11 +2042,12 @@ function abrirModalNovaComunidade() {
   const eleitoresEl = document.getElementById("formComunidadeEleitores");
   if (eleitoresEl) eleitoresEl.value = "100";
 
-  const liderSelect = document.getElementById("formComunidadeLideranca");
-  if (liderSelect) {
+  const liderInput = document.getElementById("formComunidadeLideranca");
+  if (liderInput) liderInput.value = "";
+  const liderDatalist = document.getElementById("listaLiderancasSugestoesComunidade");
+  if (liderDatalist) {
     const liderancas = db.getLiderancas();
-    liderSelect.innerHTML = '<option value="">Sem Liderança Vinculada</option>' +
-      liderancas.map(l => `<option value="${l.nome}">${l.nome} (${l.cargoPapel || 'Líder'})</option>`).join("");
+    liderDatalist.innerHTML = liderancas.map(l => `<option value="${l.nome}">${l.cargoPapel || 'Líder'} ${l.telefone ? `(${l.telefone})` : ''}</option>`).join("");
   }
 
   const obsEl = document.getElementById("formComunidadeObs");
@@ -2065,18 +2077,12 @@ function editarComunidade(id) {
 
   document.getElementById("formComunidadeEleitores").value = com.eleitoresEstimados || 100;
 
-  const liderSelect = document.getElementById("formComunidadeLideranca");
-  if (liderSelect) {
+  const liderInput = document.getElementById("formComunidadeLideranca");
+  if (liderInput) liderInput.value = com.liderancaNome || "";
+  const liderDatalist = document.getElementById("listaLiderancasSugestoesComunidade");
+  if (liderDatalist) {
     const liderancas = db.getLiderancas();
-    liderSelect.innerHTML = '<option value="">Sem Liderança Vinculada</option>' +
-      liderancas.map(l => `<option value="${l.nome}" ${com.liderancaNome === l.nome ? 'selected' : ''}>${l.nome} (${l.cargoPapel || 'Líder'})</option>`).join("");
-    if (com.liderancaNome && !liderancas.some(l => l.nome === com.liderancaNome)) {
-      const opt = document.createElement("option");
-      opt.value = com.liderancaNome;
-      opt.textContent = `${com.liderancaNome} (Atual)`;
-      opt.selected = true;
-      liderSelect.appendChild(opt);
-    }
+    liderDatalist.innerHTML = liderancas.map(l => `<option value="${l.nome}">${l.cargoPapel || 'Líder'} ${l.telefone ? `(${l.telefone})` : ''}</option>`).join("");
   }
 
   document.getElementById("formComunidadeObs").value = com.observacoes || "";
@@ -2116,6 +2122,16 @@ function salvarFormComunidade() {
 
   const saved = db.saveComunidade(payload);
 
+  if (saved && saved.id) {
+    if (liderancaNome) {
+      db.atribuirLiderancaAoBairro(saved.id, liderancaNome, saved.votosConseguidos || 0, saved.metaVotos || null);
+    } else if (id) {
+      db.atribuirLiderancaAoBairro(saved.id, null, 0);
+    }
+  }
+
+  db.sincronizarLiderancasComBairros();
+
   if (AppState.pickedLocationMarker && AppState.map) {
     AppState.map.removeLayer(AppState.pickedLocationMarker);
     AppState.pickedLocationMarker = null;
@@ -2125,6 +2141,10 @@ function salvarFormComunidade() {
   showToast(`Localidade "${nome}" salva com sucesso!`);
   renderMapaTerritorial();
   renderComunidades();
+  renderLiderancas();
+  carregarMarcadoresMapa();
+  renderTabelaLocalidadesMapa();
+  atualizarMetometroConsolidado();
   updateSidebarCounters();
 
   // Se foi uma nova localidade criada no mapa, sugere ajustar seu perímetro
@@ -2338,22 +2358,39 @@ function salvarFormLideranca() {
   };
   if (id) payload.id = id;
 
-  db.saveLideranca(payload);
+  const salvo = db.saveLideranca(payload);
+  const lidId = salvo ? salvo.id : (payload.id || id);
 
-  // Vincula comunidades selecionadas
-  comunidadesVinculadas.forEach(comId => {
-    const com = db.getComunidadeById(comId);
-    if (com && (!com.liderancaNome || com.liderancaResponsavelId === id)) {
-      com.liderancaNome = nome;
-      com.liderancaContato = telefone;
+  // 1. Desvincula qualquer comunidade que antes pertencia a esta liderança e agora foi desmarcada
+  (db.data.comunidades || []).forEach(com => {
+    if (com.liderancaResponsavelId === lidId && !comunidadesVinculadas.includes(com.id)) {
+      com.liderancaResponsavelId = null;
+      com.liderancaNome = null;
       db.saveComunidade(com);
     }
   });
 
+  // 2. Vincula comunidades selecionadas diretamente
+  comunidadesVinculadas.forEach(comId => {
+    const com = db.getComunidadeById(comId);
+    if (com) {
+      com.liderancaNome = nome;
+      com.liderancaResponsavelId = lidId;
+      if (telefone) com.liderancaContato = telefone;
+      db.saveComunidade(com);
+    }
+  });
+
+  // 3. Executa a sincronização bidirecional
+  db.sincronizarLiderancasComBairros();
+
   closeModal("modalLideranca");
-  showToast(`Liderança "${nome}" salva com sucesso!`);
+  showToast(`Liderança "${nome}" salva com sucesso e vinculada aos bairros!`);
   renderLiderancas();
   renderComunidades();
+  carregarMarcadoresMapa();
+  renderTabelaLocalidadesMapa();
+  atualizarMetometroConsolidado();
   updateSidebarCounters();
 }
 
@@ -5390,16 +5427,33 @@ function renderConfiguracoes() {
 }
 
 // --- CADASTRO E EDIÇÃO DE LOGIN E SENHA ---
+function aoAlterarPerfilUsuarioModal() {
+  const perfil = document.getElementById("formUsuarioPerfil")?.value;
+  const grupo = document.getElementById("grupoUsuarioBairroLideranca");
+  if (grupo) {
+    grupo.style.display = perfil === "LIDERANÇA COMUNITÁRIA" ? "block" : "none";
+  }
+}
+
 function abrirModalNovoUsuario() {
   document.getElementById("modalUsuarioTitle").textContent = "Cadastrar Login e Senha";
   document.getElementById("formUsuarioId").value = "";
   document.getElementById("formUsuarioNome").value = "";
   document.getElementById("formUsuarioLogin").value = "";
   document.getElementById("formUsuarioEmail").value = "";
-  document.getElementById("formUsuarioPerfil").value = "GESTOR TERRITORIAL";
+  document.getElementById("formUsuarioPerfil").value = "LIDERANÇA COMUNITÁRIA";
   document.getElementById("formUsuarioStatus").value = "Ativo";
   document.getElementById("formUsuarioSenha").value = "";
   document.getElementById("formUsuarioSenhaConfirma").value = "";
+
+  const selCom = document.getElementById("formUsuarioComunidade");
+  if (selCom) {
+    const coms = db.getComunidades();
+    selCom.innerHTML = '<option value="">-- Selecione o Bairro / Comunidade --</option>' +
+      coms.map(c => `<option value="${c.id}">${c.nome} (${c.tipo})</option>`).join("");
+  }
+  aoAlterarPerfilUsuarioModal();
+
   openModal("modalUsuario");
 }
 
@@ -5418,6 +5472,16 @@ function editarUsuario(id) {
   document.getElementById("formUsuarioStatus").value = u.status || "Ativo";
   document.getElementById("formUsuarioSenha").value = u.senha || "";
   document.getElementById("formUsuarioSenhaConfirma").value = u.senha || "";
+
+  const selCom = document.getElementById("formUsuarioComunidade");
+  if (selCom) {
+    const coms = db.getComunidades();
+    const vinc = (u.comunidadesVinculadas && u.comunidadesVinculadas[0]) || u.comunidadeId || "";
+    selCom.innerHTML = '<option value="">-- Selecione o Bairro / Comunidade --</option>' +
+      coms.map(c => `<option value="${c.id}" ${c.id === vinc ? 'selected' : ''}>${c.nome} (${c.tipo})</option>`).join("");
+  }
+  aoAlterarPerfilUsuarioModal();
+
   openModal("modalUsuario");
 }
 
@@ -5430,6 +5494,7 @@ function salvarFormUsuario() {
   const status = document.getElementById("formUsuarioStatus").value;
   const senha = document.getElementById("formUsuarioSenha").value;
   const senhaConfirma = document.getElementById("formUsuarioSenhaConfirma").value;
+  const comunidadeId = document.getElementById("formUsuarioComunidade")?.value || "";
 
   if (!nome) {
     showToast("Preencha o nome completo do usuário.");
@@ -5449,19 +5514,31 @@ function salvarFormUsuario() {
   }
 
   try {
-    const salvo = db.saveUsuario({
+    const payloadUsuario = {
       id: id || undefined,
       nome,
       login,
       email,
       perfil,
       status,
-      senha
-    });
+      senha,
+      comunidadeId: comunidadeId || undefined,
+      comunidadesVinculadas: comunidadeId ? [comunidadeId] : []
+    };
+
+    const salvo = db.saveUsuario(payloadUsuario);
+    db.sincronizarLiderancasComBairros();
 
     closeModal("modalUsuario");
     renderConfiguracoes();
     updateUserBadge();
+    renderLiderancas();
+    renderComunidades();
+    carregarMarcadoresMapa();
+    renderTabelaLocalidadesMapa();
+    atualizarMetometroConsolidado();
+    updateSidebarCounters();
+
     showToast(`Credenciais de "${salvo.nome}" (Login: ${salvo.login}) salvas com sucesso!`);
   } catch (err) {
     showToast("Erro: " + err.message);
@@ -6075,6 +6152,7 @@ window.salvarEdicaoPerimetro = salvarEdicaoPerimetro;
 window.cancelarEdicaoPerimetro = cancelarEdicaoPerimetro;
 
 // Gestão de Usuários, Login, Senha e Autenticação
+window.aoAlterarPerfilUsuarioModal = aoAlterarPerfilUsuarioModal;
 window.abrirModalNovoUsuario = abrirModalNovoUsuario;
 window.editarUsuario = editarUsuario;
 window.salvarFormUsuario = salvarFormUsuario;

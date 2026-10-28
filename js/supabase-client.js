@@ -196,13 +196,20 @@ const SupabaseClient = {
         });
       }
 
+      db.sincronizarLiderancasComBairros();
       db.save();
       if (typeof updateSidebarCounters === "function") updateSidebarCounters();
       
       // Re-renderiza a tela atual se necessário
       if (typeof AppState !== "undefined" && AppState.currentView) {
+        if (AppState.currentView === "mapa") {
+          if (typeof carregarMarcadoresMapa === "function") carregarMarcadoresMapa();
+          if (typeof renderTabelaLocalidadesMapa === "function") renderTabelaLocalidadesMapa();
+          if (typeof atualizarMetometroConsolidado === "function") atualizarMetometroConsolidado();
+        }
         if (AppState.currentView === "eleitores" && typeof renderEleitores === "function") renderEleitores();
         if (AppState.currentView === "liderancas" && typeof renderLiderancas === "function") renderLiderancas();
+        if (AppState.currentView === "comunidades" && typeof renderComunidades === "function") renderComunidades();
         if (AppState.currentView === "demandas" && typeof renderDemandas === "function") renderDemandas();
         if (AppState.currentView === "configuracoes" && typeof renderUsuariosConfig === "function") renderUsuariosConfig();
         if (AppState.currentView === "whatsapp" && typeof WhatsAppDispatcher !== "undefined") {
@@ -294,8 +301,15 @@ const SupabaseClient = {
           } else if (payload.eventType === "DELETE") {
             db.data.liderancas = (db.data.liderancas || []).filter(l => l.id !== payload.old.id);
           }
+          db.sincronizarLiderancasComBairros();
           db.save();
+          if (typeof updateSidebarCounters === "function") updateSidebarCounters();
           if (typeof renderLiderancas === "function" && AppState.currentView === "liderancas") renderLiderancas();
+          if (typeof carregarMarcadoresMapa === "function" && AppState.currentView === "mapa") {
+            carregarMarcadoresMapa();
+            if (typeof renderTabelaLocalidadesMapa === "function") renderTabelaLocalidadesMapa();
+            if (typeof atualizarMetometroConsolidado === "function") atualizarMetometroConsolidado();
+          }
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "usuarios" }, payload => {
           console.log("⚡ [Realtime] Mudança em Usuários/Logins recebida da nuvem:", payload);
@@ -310,8 +324,14 @@ const SupabaseClient = {
           } else if (payload.eventType === "DELETE") {
             db.data.usuarios = (db.data.usuarios || []).filter(u => u.id !== payload.old.id);
           }
+          db.sincronizarLiderancasComBairros();
           db.save();
+          if (typeof updateSidebarCounters === "function") updateSidebarCounters();
           if (typeof renderUsuariosConfig === "function" && AppState.currentView === "configuracoes") renderUsuariosConfig();
+          if (typeof carregarMarcadoresMapa === "function" && AppState.currentView === "mapa") {
+            carregarMarcadoresMapa();
+            if (typeof renderTabelaLocalidadesMapa === "function") renderTabelaLocalidadesMapa();
+          }
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "demandas" }, payload => {
           console.log("⚡ [Realtime] Mudança em Demandas recebida da nuvem:", payload);

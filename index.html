@@ -1789,7 +1789,9 @@
         </div>
         <div class="form-group">
           <label class="form-label">Liderança Responsável</label>
-          <select class="form-control" id="formComunidadeLideranca"></select>
+          <input type="text" class="form-control" id="formComunidadeLideranca" placeholder="Digite ou selecione o líder..." list="listaLiderancasSugestoesComunidade">
+          <datalist id="listaLiderancasSugestoesComunidade"></datalist>
+          <small style="color:var(--text-muted); font-size:0.74rem;">Selecione uma liderança existente ou digite o nome de um novo líder.</small>
         </div>
         <div class="form-group full">
           <label class="form-label">Observações Administrativas</label>
@@ -2772,12 +2774,18 @@
         </div>
         <div class="form-group">
           <label class="form-label">Perfil de Acesso (RBAC) *</label>
-          <select class="form-control" id="formUsuarioPerfil">
+          <select class="form-control" id="formUsuarioPerfil" onchange="aoAlterarPerfilUsuarioModal()">
             <option value="ADMINISTRADOR MASTER">ADMINISTRADOR MASTER (Acesso Total)</option>
+            <option value="LIDERANÇA COMUNITÁRIA">LIDERANÇA COMUNITÁRIA (Exclusivo Bairro / Mobile)</option>
             <option value="GESTOR TERRITORIAL">GESTOR TERRITORIAL (Mapeamento & Campo)</option>
             <option value="ANALISTA">ANALISTA (Dados TSE & Simulador)</option>
             <option value="CONSULTA">CONSULTA (Somente Visualização)</option>
           </select>
+        </div>
+        <div class="form-group" id="grupoUsuarioBairroLideranca" style="display:none;">
+          <label class="form-label" style="color:var(--emerald-400); font-weight:700;">Bairro / Localidade Atribuída *</label>
+          <select class="form-control" id="formUsuarioComunidade"></select>
+          <small style="color:var(--text-muted); font-size:0.75rem;">A liderança cuidará com exclusividade desta localidade no mapa e eleitores.</small>
         </div>
         <div class="form-group">
           <label class="form-label">Status do Acesso *</label>
