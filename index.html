@@ -1,0 +1,2832 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RADAR BACURAU — Plataforma Premium de Inteligência Eleitoral | Riachuelo–RN</title>
+  <meta name="description" content="Plataforma de inteligência territorial, acompanhamento de lideranças e análise estatística de resultados eleitorais no município de Riachuelo, Rio Grande do Norte, Brasil.">
+  <meta name="referrer" content="origin-when-cross-origin">
+  <link rel="icon" type="image/png" href="assets/radarbacurau.png">
+
+  <!-- Estilos Externos: Leaflet com Fallback Anti-Bloqueio -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+  
+  <!-- Estilos Próprios da Aplicação -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Bibliotecas Externas: Leaflet com Fallback, Chart.js, SheetJS (XLSX) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    if (typeof L === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script>');
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- SDK Oficial Supabase (Nuvem em Tempo Real) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div class="app-layout">
+  
+  <!-- ========================================================================
+       SIDEBAR
+       ======================================================================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo-container" onclick="navigateTo('mapa')" style="cursor:pointer;" title="Radar Bacurau — Riachuelo/RN">
+        <img src="assets/radarbacurau.png" alt="Radar Bacurau — Riachuelo/RN" class="sidebar-logo">
+      </div>
+      <div class="sidebar-brand">
+        <p class="sidebar-brand-subtitle">Inteligência Eleitoral</p>
+      </div>
+    </div>
+
+    <div class="sidebar-badge">
+      <div class="dot"></div>
+      <span>RIACHUELO–RN • 8ª ZONA</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">Comando Principal</div>
+      
+      <a class="nav-item active" data-view="dashboard">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
+        <span>Painel Principal</span>
+      </a>
+
+      <a class="nav-item" data-view="mapa">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" /></svg>
+        <span>Mapa Territorial</span>
+        <span class="nav-counter" id="cnt-comunidades">18</span>
+      </a>
+
+      <div class="nav-section-title">Território & Lideranças</div>
+      <a class="nav-item" data-view="comunidades">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" /></svg>
+        <span>Comunidades & Bairros</span>
+      </a>
+
+      <a class="nav-item" data-view="liderancas">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+        <span>Gestão de Lideranças</span>
+        <span class="nav-counter" id="cnt-liderancas">7</span>
+      </a>
+
+      <a class="nav-item" data-view="eleitores">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.999-3.199a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" /></svg>
+        <span>Cadastro de Eleitores</span>
+        <span class="nav-counter" id="cnt-eleitores">0</span>
+      </a>
+
+      <a class="nav-item" data-view="whatsapp">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a.75.75 0 01-1.074-.865 5.955 5.955 0 00.916-2.915C4.168 15.753 3 13.992 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" /></svg>
+        <span>Disparo WhatsApp</span>
+        <span class="nav-counter" id="cnt-whatsapp" style="background:#25D366; color:#000;">0</span>
+      </a>
+
+      <a class="nav-item" data-view="demandas">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.09 1.976 1.052 1.976 2.188V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" /></svg>
+        <span>Demandas Comunitárias</span>
+        <span class="nav-counter" id="cnt-demandas">0</span>
+      </a>
+
+      <div class="nav-section-title">Dados Eleitorais (TSE)</div>
+      <a class="nav-item" data-view="secoes">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
+        <span>Seções Eleitorais</span>
+        <span class="nav-counter" id="cnt-secoes">16</span>
+      </a>
+
+      <a class="nav-item" data-view="resultados">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <span>Lançamento de Resultados</span>
+      </a>
+
+      <a class="nav-item" data-view="estatisticas">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+        <span>Ranking & Estatísticas TSE</span>
+      </a>
+
+      <a class="nav-item" data-view="simulador">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 3h.008v.008H8.25v-.008zm0 3h.008v.008H8.25v-.008zm3.75-6h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm3.75-6h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm1.5-4.5H6.75A2.25 2.25 0 004.5 9v10.5A2.25 2.25 0 006.75 21.75h10.5A2.25 2.25 0 0019.5 19.5V9a2.25 2.25 0 00-2.25-2.25zM6 6.75h12M9 3.75h6" /></svg>
+        <span>Simulador Eleitoral (QE)</span>
+        <span class="nav-counter" style="background:var(--gold-500); color:#000;">9 Vagas</span>
+      </a>
+
+      <div class="nav-section-title">Segurança & Governança</div>
+      <a class="nav-item" data-view="lgpd">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" /></svg>
+        <span>Cadastro Restrito (LGPD)</span>
+      </a>
+
+      <a class="nav-item" data-view="auditoria">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <span>Auditoria & Logs</span>
+      </a>
+
+      <a class="nav-item" data-view="configuracoes">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" /></svg>
+        <span>Backup & Ajustes</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-profile-card">
+        <div class="user-avatar" id="currentUserAvatar" onclick="openRoleModal()" style="cursor:pointer;" title="Clique para alternar perfil">AD</div>
+        <div class="user-info" onclick="openRoleModal()" style="cursor:pointer;" title="Clique para alternar perfil">
+          <div class="user-name" id="currentUserName">ADMINISTRADOR</div>
+          <div class="user-role" id="currentUserRole">ADMINISTRADOR MASTER</div>
+        </div>
+        <button type="button" class="btn-icon" onclick="abrirTelaLogin()" style="margin-left:auto; font-size:1.1rem; padding:4px;" title="Bloquear / Trocar de Usuário (Login)">
+          🚪
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========================================================================
+       MAIN WRAPPER & TOPBAR
+       ======================================================================== -->
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-toggle" id="mobileToggle" aria-label="Abrir menu">☰</button>
+        <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="topbar-logo-mobile" onclick="navigateTo('mapa')" title="Radar Bacurau">
+        <div class="breadcrumb-area">
+          <h2 id="breadcrumbTitle">Painel Principal de Inteligência <span class="breadcrumb-badge">8ª ZONA ELEITORAL</span></h2>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Indicador Supabase Nuvem -->
+        <div class="supabase-status-indicator offline" title="Status da Nuvem (Supabase) — Clique para configurar" onclick="navigateTo('configuracoes')" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-size:0.78rem; padding:5px 12px; border-radius:14px; background:rgba(255,255,255,0.06); border:1px solid var(--border-subtle); color:var(--text-main);">
+          ⚪ <span>Banco Local</span>
+        </div>
+
+        <div class="system-status-indicator">
+          <div class="status-dot-pulse"></div>
+          <span>Sincronizado: <strong id="lastUpdatedText">Carregando...</strong></span>
+        </div>
+
+        <!-- Seletor Rápido de Papel (RBAC) -->
+        <button class="role-selector-btn" id="roleSelectorBtn" title="Alterar perfil de acesso (RBAC)">
+          <span>👤 Perfil:</span>
+          <strong id="roleBtnText">ADMINISTRADOR MASTER</strong>
+        </button>
+
+        <!-- Botão Alternador de Tema Escuro / Claro -->
+        <button class="btn-icon" id="themeToggle" title="Alternar Modo Escuro / Claro">
+          🌓
+        </button>
+
+        <!-- Botão de Impressão de Relatório -->
+        <button class="btn-icon" onclick="imprimirRelatorioExecutivo()" title="Imprimir Relatório Executivo">
+          🖨️
+        </button>
+      </div>
+    </header>
+
+    <!-- ======================================================================
+         ÁREA DE CONTEÚDO DINÂMICA
+         ====================================================================== -->
+    <main class="content-area">
+
+      <!-- ====================================================================
+           1. VIEW: DASHBOARD
+           ==================================================================== -->
+      <section class="view-panel active" id="view-dashboard">
+        <!-- Hero Radar Banner -->
+        <div class="hero-radar-banner">
+          <div class="hero-content">
+            <span class="hero-tag">⚡ MONITORAMENTO GEOELEITORAL EM TEMPO REAL</span>
+            <h2>RADAR BACURAU — RIACHUELO/RN</h2>
+            <p>Plataforma de inteligência territorial com 100% de dados baseados em registros oficiais da Justiça Eleitoral (TRE-RN), INCRA e mapeamento comunitário verificado.</p>
+            <div class="hero-actions">
+              <button class="btn btn-gold" onclick="navigateTo('mapa')">
+                🗺️ Explorar Mapa Territorial
+              </button>
+              <button class="btn btn-primary" onclick="abrirModalLancamentoResultado()">
+                🗳️ Lançar Resultado Eleitoral
+              </button>
+              <button class="btn btn-secondary" onclick="exportarExcelRelatorioGeral()">
+                📊 Exportar Relatório Excel
+              </button>
+            </div>
+          </div>
+
+          <div class="hero-radar-visual">
+            <div class="radar-circle c1"></div>
+            <div class="radar-circle c2"></div>
+            <div class="radar-circle c3"></div>
+            <div class="radar-sweep-hand"></div>
+            <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="radar-center-logo">
+          </div>
+        </div>
+
+        <!-- Grade de Cards KPI -->
+        <div class="grid-kpi">
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-title">Comunidades & Bairros</span>
+              <div class="kpi-icon">📍</div>
+            </div>
+            <div class="kpi-value" id="kpi-comunidades">0</div>
+            <div class="kpi-subtitle" id="kpi-comunidades-sub">Calculando...</div>
+          </div>
+
+          <div class="kpi-card kpi-gold">
+            <div class="kpi-header">
+              <span class="kpi-title">Lideranças Cadastradas</span>
+              <div class="kpi-icon">👥</div>
+            </div>
+            <div class="kpi-value" id="kpi-liderancas">0</div>
+            <div class="kpi-subtitle" id="kpi-liderancas-sub">Calculando...</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-header">
+              <span class="kpi-title">Seções Mapeadas (8ª ZE)</span>
+              <div class="kpi-icon">🗳️</div>
+            </div>
+            <div class="kpi-value" id="kpi-secoes">0</div>
+            <div class="kpi-subtitle" id="kpi-secoes-sub">Calculando...</div>
+          </div>
+
+          <div class="kpi-card kpi-info">
+            <div class="kpi-header">
+              <span class="kpi-title">Total de Votos Contabilizados</span>
+              <div class="kpi-icon">📈</div>
+            </div>
+            <div class="kpi-value" id="kpi-votos">0</div>
+            <div class="kpi-subtitle" id="kpi-votos-sub">Calculando...</div>
+          </div>
+
+          <div class="kpi-card kpi-danger">
+            <div class="kpi-header">
+              <span class="kpi-title">Pendências de Conferência</span>
+              <div class="kpi-icon">⚠️</div>
+            </div>
+            <div class="kpi-value" id="kpi-pendencias">0</div>
+            <div class="kpi-subtitle" id="kpi-pendencias-sub">Calculando...</div>
+          </div>
+        </div>
+
+        <!-- Seção Dupla: Gráfico Prefeito 2024 e Top Localidades -->
+        <div class="charts-grid-2">
+          <div class="chart-card">
+            <div class="section-header">
+              <div class="section-title-wrap">
+                <h3>Votação Consolidada — Prefeito (2024)</h3>
+                <p>Resultado agregado oficial das 16 seções de Riachuelo–RN</p>
+              </div>
+              <span class="badge-status oficial">OFICIAL TSE</span>
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="dashCandidatosChart"></canvas>
+            </div>
+          </div>
+
+          <div class="card-section">
+            <div class="section-header">
+              <div class="section-title-wrap">
+                <h3>Pólos Territoriais com Maior Eleitorado</h3>
+                <p>Comparativo dinâmico por localidade de Riachuelo</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="navigateTo('comunidades')">Ver Todas</button>
+            </div>
+            <div class="table-responsive">
+              <table class="radar-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Localidade</th>
+                    <th>Liderança Atribuída</th>
+                    <th>Eleitores</th>
+                    <th>Situação</th>
+                  </tr>
+                </thead>
+                <tbody id="dashTopLocalidadesBody">
+                  <!-- Inserido dinamicamente -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           2. VIEW: MAPA TERRITORIAL
+           ==================================================================== -->
+      <section class="view-panel" id="view-mapa">
+        <!-- 🎯 PAINEL METÔMETRO CONSOLIDADO DE VOTOS (RIACHUELO GERAL) -->
+        <div class="card-section metometro-consolidado-card" style="margin-bottom: 16px; background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(3, 20, 12, 0.75) 100%); border: 1px solid var(--emerald-500); padding: 14px 20px; border-radius: var(--radius-lg);">
+          <div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:16px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <div style="font-size:2rem; background:rgba(16,185,129,0.18); width:52px; height:52px; border-radius:12px; display:flex; align-items:center; justify-content:center; border:1px solid var(--emerald-400); box-shadow:0 0 14px rgba(16,185,129,0.25);">🎯</div>
+              <div>
+                <div style="font-size:0.75rem; text-transform:uppercase; color:var(--emerald-400); font-weight:800; letter-spacing:1px;">Metômetro Geral — Riachuelo / RN</div>
+                <div style="display:flex; align-items:baseline; gap:8px; margin-top:2px;">
+                  <span id="metometroVotosAtuais" style="font-size:1.6rem; font-weight:800; color:#ffffff; font-family:var(--font-mono);">0</span>
+                  <span style="color:var(--text-muted); font-size:1rem;">/</span>
+                  <span id="metometroMetaTotal" style="font-size:1.2rem; font-weight:700; color:var(--gold-400); font-family:var(--font-mono);">0 votos</span>
+                  <span id="metometroPercentualBadge" class="badge-status oficial" style="font-size:0.8rem; font-weight:800; margin-left:6px;">0% Atingido</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="flex:1; min-width:240px; max-width:440px;">
+              <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">
+                <span>Progresso Territorial Consolidado:</span>
+                <span id="metometroStatusTexto" style="color:var(--emerald-300); font-weight:700;">Calculando...</span>
+              </div>
+              <div class="meta-progress-track">
+                <div id="metometroProgressBar" class="meta-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="text-align:center; padding:6px 14px; background:rgba(255,255,255,0.04); border-radius:8px; border:1px solid var(--border-subtle);">
+                <div style="font-size:0.68rem; color:var(--text-muted);">Metas Atingidas</div>
+                <div id="metometroBairrosBatidos" style="font-size:1.15rem; font-weight:800; color:var(--emerald-400); font-family:var(--font-mono);">0 / 20</div>
+              </div>
+              <button class="btn btn-gold btn-sm" onclick="abrirModalMapearLiderBairro()" title="Definir metas e lideranças por localidade">
+                🎯 Gerenciar Metas
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Cartografia Interativa — Riachuelo / RN</h3>
+              <p>Visualização em Satélite HD com ruas, casas, contornos dos bairros e zonas térmicas eleitorais</p>
+            </div>
+            <div class="section-actions">
+              <div class="search-input-wrap" style="min-width: 220px;">
+                <select id="selectFocoBairro" class="form-select form-select-sm" style="background:var(--bg-card); border-color:var(--border-subtle); color:var(--text-main); font-weight:700; padding:6px 12px; cursor:pointer;" onchange="focarBairroEspecifico(this.value)">
+                  <option value="">🎯 Ir para Bairro / Área...</option>
+                  <optgroup label="🏘️ Sede Urbana / Bairros">
+                    <option value="SEDE_INTEGRAL">🏛️ Toda a Sede Urbana (Centro & Bairros Unidos)</option>
+                    <option value="com-01">📍 Centro Histórico / Sede (Todo o Centro)</option>
+                    <option value="com-02">Nossa Senhora da Conceição</option>
+                    <option value="com-03">Alto da Boa Vista</option>
+                    <option value="com-04">Bairro Novo / Conj. Severiano</option>
+                    <option value="com-19">Bela Vista / Beira Rio</option>
+                  </optgroup>
+                  <optgroup label="📍 Distrito & Polos">
+                    <option value="com-00">Cachoeira do Sapo (Distrito)</option>
+                  </optgroup>
+                  <optgroup label="🌾 Assentamentos Rurais INCRA">
+                    <option value="com-05">Assentamento Furnas</option>
+                    <option value="com-06">PA Espinheiro</option>
+                    <option value="com-07">PA Lagoa Nova I</option>
+                    <option value="com-08">PA Pedra Branca</option>
+                    <option value="com-09">PA Patativa do Assaré II</option>
+                  </optgroup>
+                  <optgroup label="🌄 Comunidades & Sítios Rurais">
+                    <option value="com-10">Serra da Formiga</option>
+                    <option value="com-11">Potengi Pequeno</option>
+                    <option value="com-12">Sítio Várzea Fria</option>
+                    <option value="com-13">Sítio Tijuca</option>
+                    <option value="com-14">Sítio Quixabeira</option>
+                    <option value="com-15">Sítio Xavier</option>
+                    <option value="com-16">Sítio Carnaúba</option>
+                    <option value="com-17">Arisco dos Ernesto</option>
+                    <option value="com-18">Serra Azul</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              <button class="btn btn-primary btn-sm" id="btnSatEsri" onclick="alternarCamadaSatelite('esri')" title="Satélite Maxar HD com ruas e casas. 100% garantido sem bloqueio ou quedas.">🛰️ Satélite HD</button>
+              <button class="btn btn-secondary btn-sm" id="btnSatGoogle" onclick="alternarCamadaSatelite('google')" title="Satélite Híbrido Google com vias e nomes">🛰️ Google Satélite</button>
+              <button class="btn btn-secondary btn-sm" id="btnRuas" onclick="alternarCamadaRuas()" title="Mapa vetorial nítido de ruas e avenidas (Google Maps)">🗺️ Google Ruas</button>
+              <button class="btn btn-secondary btn-sm" id="btnToggleHeatmap" onclick="alternarHeatmap()" title="Ativa o Raio-X de Calor Eleitoral: mapa térmico de concentração e metas territoriais">🌡️ Raio-X de Calor</button>
+              <button class="btn btn-secondary btn-sm" id="btnTogglePoligonos" onclick="alternarExibicaoPoligonos()" title="Oculta os polígonos coloridos para ver os telhados e ruas 100% limpos">👁️ Contornos</button>
+              <button class="btn btn-secondary btn-sm" id="btnToggleEtiquetas" onclick="alternarExibicaoEtiquetas()" title="Oculta os nomes dos bairros para não cobrir as casas">🏷️ Nomes</button>
+              <button class="btn btn-secondary btn-sm" id="btnToggleLimiteMunicipal" onclick="alternarLimiteMunicipal()" title="Exibe o limite oficial das divisas municipais de Riachuelo–RN (IBGE)">🌐 Divisas</button>
+              <button class="btn btn-secondary btn-sm" onclick="focarBairroEspecifico('com-01')" title="Foca e destaca todo o contorno do Centro de Riachuelo">🏛️ Focar Centro</button>
+              <button class="btn btn-secondary btn-sm" onclick="focarCentroCasas()" title="Aproxima zoom máximo (zoom 18) nas ruas e casas da sede urbana de Riachuelo">🏘️ Zoom Casas</button>
+              <button class="btn btn-secondary btn-sm" onclick="focarCachoeiraSapo()" title="Aproxima zoom máximo nas casas de Cachoeira do Sapo">📍 Cachoeira do Sapo</button>
+              <button class="btn btn-secondary btn-sm" onclick="centralizarMunicipio()" title="Retorna para a visão de todo o município de Riachuelo">🌐 Município</button>
+              <button class="btn btn-secondary btn-sm" id="btnEditarPerimetro" onclick="toggleModoEdicaoPerimetro()" title="Aumentar ou diminuir os perímetros dos bairros arrastando pontos ou com zoom">✏️ Editar Perímetro</button>
+              <button class="btn btn-gold btn-sm" onclick="abrirModalNovaComunidade()">+ Nova Localidade</button>
+            </div>
+          </div>
+
+          <div class="map-view-container" style="position:relative;">
+            <!-- Banner de Captura de Ponto no Mapa -->
+            <div class="map-picker-banner" id="mapPickerBanner" style="display:none;">
+              <span style="font-size:1.3rem;">📍</span>
+              <div>
+                <strong style="color:#ffffff; font-size:0.88rem;">Clique no mapa para marcar a localização:</strong>
+                <span style="font-size:0.75rem; color:#a7f3d0; display:block;">Posicione o ponteiro sobre as ruas ou casas e clique uma vez para capturar o GPS.</span>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="cancelarSelecaoPontoNoMapa()" style="margin-left:auto; padding:4px 10px;">✕ Cancelar</button>
+            </div>
+
+            <!-- Barra Flutuante de Edição de Perímetro (Aumentar / Diminuir) -->
+            <div class="map-polygon-editor-bar" id="mapPolygonEditorBar" style="display:none;">
+              <div class="editor-bar-header">
+                <div class="editor-bar-title">
+                  <span>✏️ Editando Perímetro: <strong id="editorBairroNome" style="color:var(--gold-400);">...</strong></span>
+                  <span class="editor-bar-badge" id="editorVerticesCount">0 vértices</span>
+                </div>
+                <button type="button" class="modal-close" style="font-size:1.2rem; color:var(--text-muted); cursor:pointer;" onclick="cancelarEdicaoPerimetro()" title="Fechar editor">&times;</button>
+              </div>
+
+              <div class="editor-bar-controls">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="ajustarEscalaPerimetro(1.05)" title="Aumentar perímetro em 5% uniformemente">
+                  ➕ Aumentar (+5%)
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="ajustarEscalaPerimetro(0.95)" title="Diminuir perímetro em 5% uniformemente">
+                  ➖ Diminuir (-5%)
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="reverterEdicaoPerimetro()" title="Reverter alterações para o contorno original">
+                  🔄 Reverter
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="salvarEdicaoPerimetro()" style="background:var(--emerald-600); font-weight:700;">
+                  💾 Salvar Perímetro
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="cancelarEdicaoPerimetro()">
+                  ✕ Cancelar
+                </button>
+              </div>
+
+              <div class="editor-bar-help">
+                💡 <em>Arraste os pinos circulares para esticar ou encolher qualquer lado do contorno. Clique nos pontos intermediários azuis para criar novos vértices. Botão direito no pino remove o vértice.</em>
+              </div>
+            </div>
+
+            <div id="map-container"></div>
+            
+            <div class="map-floating-panel" id="mapLegendPanel">
+              <div style="font-size:0.85rem; font-weight:700; color:#ffffff; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                <span>Setores & Contornos:</span>
+                <button type="button" class="btn btn-secondary btn-sm" id="btnMinimizarLegenda" style="padding:1px 6px; font-size:0.65rem;" onclick="togglePainelLegenda()">Minimizar</button>
+              </div>
+              <div id="conteudoPainelLegenda">
+                <div class="map-legend-item"><span class="legend-dot sede"></span> Sede Urbana / Centro Histórico</div>
+                <div class="map-legend-item"><span class="legend-dot distrito"></span> Distrito Cachoeira do Sapo (Polo)</div>
+                <div class="map-legend-item"><span class="legend-dot expansao"></span> Bairros de Expansão Urbana</div>
+                <div class="map-legend-item"><span class="legend-dot assentamento"></span> Assentamentos Rurais (INCRA)</div>
+                <div class="map-legend-item"><span class="legend-dot comunidade"></span> Comunidades Rurais</div>
+                <div class="map-legend-item"><span class="legend-dot sitio"></span> Sítios e Serras</div>
+                <div class="map-legend-item"><span class="legend-line-municipal"></span> Limite Municipal Oficial (IBGE)</div>
+                
+                <div style="border-top:1px dashed var(--border-subtle); padding-top:8px; margin-top:8px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:0.72rem; color:var(--text-muted);">Opacidade dos Contornos:</span>
+                    <span id="labelOpacidadeVal" style="font-size:0.72rem; font-weight:700; color:var(--emerald-400);">5%</span>
+                  </div>
+                  <input type="range" id="sliderOpacidadePoligonos" min="0" max="0.6" step="0.05" value="0.05" style="width:100%; cursor:pointer;" oninput="aoMudarOpacidadePoligonos(this.value)">
+                  <div style="display:flex; justify-content:space-between; font-size:0.65rem; color:var(--text-dim); margin-top:2px;">
+                    <span>0% (Limpo)</span>
+                    <span>60% (Forte)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Lista Geral de Localidades Mapeadas</h3>
+              <p>Clique em "Localizar" para centralizar o mapa na comunidade</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th>Nome da Localidade</th>
+                  <th>Tipo / Setor</th>
+                  <th>Liderança Atribuída</th>
+                  <th style="min-width: 170px;">🎯 Meta de Votos & Progresso</th>
+                  <th>Eleitores</th>
+                  <th style="min-width: 220px;">Ações de Campo & Mapa</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaLocalidadesMapaBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           3. VIEW: GESTÃO DE COMUNIDADES
+           ==================================================================== -->
+      <section class="view-panel" id="view-comunidades">
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Gestão Territorial de Comunidades e Bairros</h3>
+              <p>Cadastro oficial de localidades, delimitações e lideranças associadas</p>
+            </div>
+            <div class="section-actions">
+              <div class="search-input-wrap">
+                <i>🔍</i>
+                <input type="text" class="form-input" id="searchComunidadeInput" placeholder="Buscar comunidade..." oninput="renderComunidades()">
+              </div>
+              <select class="form-select" id="filtroTipoComunidade" onchange="renderComunidades()">
+                <option value="">Todos os Tipos</option>
+                <option value="Bairro">Bairros Urbanos</option>
+                <option value="Assentamento">Assentamentos INCRA</option>
+                <option value="Comunidade">Comunidades Rurais</option>
+                <option value="Sítio">Sítios</option>
+              </select>
+              <select class="form-select" id="filtroStatusComunidade" onchange="renderComunidades()">
+                <option value="">Todas as Situações</option>
+                <option value="Oficial Confirmado">Oficial Confirmado</option>
+                <option value="Pendente de Validação">Pendente de Validação</option>
+              </select>
+              <button class="btn btn-gold" onclick="abrirModalNovaComunidade()">+ Cadastrar Localidade</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th>Localidade / Código</th>
+                  <th>Tipo de Território</th>
+                  <th>Liderança Responsável</th>
+                  <th>Locais de Votação Vinculados</th>
+                  <th>Eleitores Estimados</th>
+                  <th>Situação da Conferência</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="comunidadesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           4. VIEW: GESTÃO DE LIDERANÇAS
+           ==================================================================== -->
+      <section class="view-panel" id="view-liderancas">
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Gestão de Lideranças Territoriais</h3>
+              <p>Cadastramento, histórico de mandatos e vinculação de lideranças às comunidades</p>
+            </div>
+            <div class="section-actions">
+              <div class="search-input-wrap">
+                <i>🔍</i>
+                <input type="text" class="form-input" id="searchLiderancaInput" placeholder="Buscar líder ou apelido..." oninput="renderLiderancas()">
+              </div>
+              <select class="form-select" id="filtroStatusLideranca" onchange="renderLiderancas()">
+                <option value="">Todos os Status</option>
+                <option value="Ativo">Ativas</option>
+                <option value="Inativo">Inativas / Históricas</option>
+              </select>
+              <button class="btn btn-gold" onclick="abrirModalNovaLideranca()">+ Cadastrar Liderança</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th>Nome / Apelido</th>
+                  <th>Cargo / Papel</th>
+                  <th>Contatos</th>
+                  <th>Comunidades Vinculadas</th>
+                  <th>Período do Mandato</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="liderancasTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           4.1. VIEW: CADASTRO DE ELEITORES POR BAIRRO E LIDERANÇA
+           ==================================================================== -->
+      <section class="view-panel" id="view-eleitores">
+        <!-- Indicadores Rápidos -->
+        <div class="eleitor-kpi-grid">
+          <div class="tse-kpi-card gold">
+            <div class="tse-kpi-label">Total de Eleitores Cadastrados</div>
+            <div class="tse-kpi-value" id="kpiEleitoresTotal">0</div>
+            <div class="tse-kpi-sub" id="kpiEleitoresTotalSub">Mapeados por bairro e liderança</div>
+          </div>
+          <div class="tse-kpi-card">
+            <div class="tse-kpi-label">Títulos Anexados com Foto</div>
+            <div class="tse-kpi-value" id="kpiEleitoresComFoto">0</div>
+            <div class="tse-kpi-sub" id="kpiEleitoresComFotoSub">Documentos fotográficos conferidos</div>
+          </div>
+          <div class="tse-kpi-card blue">
+            <div class="tse-kpi-label">Bairro com Mais Cadastros</div>
+            <div class="tse-kpi-value" id="kpiEleitoresBairroLider">-</div>
+            <div class="tse-kpi-sub" id="kpiEleitoresBairroLiderSub">Polo comunitário principal</div>
+          </div>
+          <div class="tse-kpi-card gold">
+            <div class="tse-kpi-label">Liderança com Mais Eleitores</div>
+            <div class="tse-kpi-value" id="kpiEleitoresLiderDestaque">-</div>
+            <div class="tse-kpi-sub" id="kpiEleitoresLiderDestaqueSub">Articulação direta no território</div>
+          </div>
+        </div>
+
+        <!-- Painéis de Agregação Computada (Por Bairro / Por Liderança) -->
+        <div class="eleitor-breakdown-grid">
+          <div class="eleitor-breakdown-card">
+            <div class="eleitor-breakdown-header">
+              <h4>
+                <span>🏘️ Computado por Bairro / Localidade</span>
+              </h4>
+              <span class="badge-status oficial" style="font-size:0.7rem;">Território</span>
+            </div>
+            <div class="eleitor-breakdown-list" id="eleitoresPorBairroList">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+
+          <div class="eleitor-breakdown-card">
+            <div class="eleitor-breakdown-header">
+              <h4>
+                <span>🎖️ Computado por Liderança Responsável</span>
+              </h4>
+              <span class="badge-status oficial" style="font-size:0.7rem;">Articulação</span>
+            </div>
+            <div class="eleitor-breakdown-list" id="eleitoresPorLiderancaList">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela Nominal e Ações de Eleitores -->
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>👥 Base Nominal de Eleitores Cadastrados</h3>
+              <p id="subtituloSecaoEleitores">Mapeamento nominal com rua, endereço, seção, título de eleitor e liderança exclusiva</p>
+            </div>
+            <div class="section-actions">
+              <select class="form-select" id="filtroEleitorBairro" onchange="renderEleitores()">
+                <option value="">Todos os Bairros</option>
+              </select>
+              <select class="form-select" id="filtroEleitorLideranca" onchange="renderEleitores()">
+                <option value="">Todas as Lideranças</option>
+              </select>
+              <select class="form-select" id="filtroEleitorSecao" onchange="renderEleitores()">
+                <option value="">Todas as 16 Seções</option>
+              </select>
+              <div class="search-input-wrap">
+                <i>🔍</i>
+                <input type="text" class="form-input" id="searchEleitorInput" placeholder="Buscar por nome, nº do título, rua, bairro..." oninput="renderEleitores()">
+              </div>
+              <button class="btn btn-gold" onclick="abrirModalNovoEleitor()">+ Cadastrar Eleitor</button>
+              <button class="btn btn-primary" onclick="iniciarDisparoEmMassaEleitores()" style="background:#25D366; color:#000; font-weight:700; border:none;" title="Abrir painel de disparo territorial em massa no WhatsApp">💬 Disparo WhatsApp</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportarEleitoresCSV()">📥 Exportar CSV</button>
+            </div>
+          </div>
+
+          <!-- Banner Informativo quando o usuário ativo for Liderança Comunitária -->
+          <div id="eleitorBannerModoLideranca" style="display:none; margin-bottom:14px; background:rgba(16,185,129,0.12); border:1px solid var(--emerald-500); border-radius:8px; padding:10px 14px; font-size:0.83rem; color:var(--emerald-300);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.1rem;">🔒</span>
+              <div>
+                <strong>Modo Exclusivo de Liderança:</strong> Você está visualizando e gerenciando apenas os eleitores vinculados à sua liderança (<span id="eleitorNomeLiderAtual" style="color:#ffffff; font-weight:700;"></span>). Cada eleitor cadastrado pertence unicamente a você.
+              </div>
+            </div>
+          </div>
+
+          <!-- Barra de Navegação Lateral da Tabela -->
+          <div class="table-scroll-banner">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span>↔️</span>
+              <span><strong>Navegação da Tabela:</strong> Deslize ou use os botões para visualizar todas as colunas de endereço, títulos e fotos</span>
+            </div>
+            <div class="table-scroll-buttons">
+              <button type="button" class="table-scroll-btn" onclick="rolarTabelaEleitores('esquerda')">◀ Rolar Esquerda</button>
+              <button type="button" class="table-scroll-btn" onclick="rolarTabelaEleitores('direita')">Rolar Direita ▶</button>
+            </div>
+          </div>
+
+          <div class="table-responsive" id="eleitoresTableResponsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th style="width:70px;">Doc</th>
+                  <th>Eleitor & Nº do Título</th>
+                  <th>Rua / Logradouro</th>
+                  <th>Endereço & Complemento</th>
+                  <th>Bairro / Comunidade</th>
+                  <th>Seção Eleitoral</th>
+                  <th>Liderança Exclusiva</th>
+                  <th>Telefone / Contato</th>
+                  <th>Cadastrado em</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="eleitoresTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           4.2. VIEW: DEMANDAS COMUNITÁRIAS & ATENDIMENTO TERRITORIAL
+           ==================================================================== -->
+      <section class="view-panel" id="view-demandas">
+        <!-- Indicadores Rápidos -->
+        <div class="demanda-kpi-grid">
+          <div class="tse-kpi-card gold">
+            <div class="tse-kpi-label">Total de Demandas</div>
+            <div class="tse-kpi-value" id="kpiDemandasTotal">0</div>
+            <div class="tse-kpi-sub" id="kpiDemandasTotalSub">Registros territoriais ativos</div>
+          </div>
+          <div class="tse-kpi-card">
+            <div class="tse-kpi-label">Demandas Pendentes</div>
+            <div class="tse-kpi-value" id="kpiDemandasPendentes" style="color:#f87171;">0</div>
+            <div class="tse-kpi-sub">Aguardando providências</div>
+          </div>
+          <div class="tse-kpi-card blue">
+            <div class="tse-kpi-label">Em Andamento / Obras</div>
+            <div class="tse-kpi-value" id="kpiDemandasAndamento" style="color:#60a5fa;">0</div>
+            <div class="tse-kpi-sub">Com ofício ou cronograma</div>
+          </div>
+          <div class="tse-kpi-card">
+            <div class="tse-kpi-label">Atendidas / Concluídas</div>
+            <div class="tse-kpi-value" id="kpiDemandasConcluidas" style="color:var(--emerald-400);">0</div>
+            <div class="tse-kpi-sub" id="kpiDemandasTaxa">Taxa de Resolução: 0%</div>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>📋 Gestão Territorial de Demandas Comunitárias</h3>
+              <p>Mapeamento de necessidades dos bairros, solicitações de lideranças e status de resolução</p>
+            </div>
+            <div class="section-actions">
+              <select class="form-select" id="filtroDemandaStatus" onchange="renderDemandas()">
+                <option value="">Todos os Status</option>
+                <option value="Pendente">Pendentes</option>
+                <option value="Em Andamento">Em Andamento</option>
+                <option value="Concluído">Concluídas</option>
+              </select>
+              <select class="form-select" id="filtroDemandaCategoria" onchange="renderDemandas()">
+                <option value="">Todas as Categorias</option>
+                <option value="Infraestrutura & Estradas">Infraestrutura & Estradas</option>
+                <option value="Iluminação Pública">Iluminação Pública</option>
+                <option value="Saneamento & Água">Saneamento & Água</option>
+                <option value="Saúde Pública">Saúde Pública</option>
+                <option value="Esporte & Juventude">Esporte & Juventude</option>
+                <option value="Educação">Educação</option>
+                <option value="Assistência Social">Assistência Social</option>
+                <option value="Outras">Outras</option>
+              </select>
+              <select class="form-select" id="filtroDemandaPrioridade" onchange="renderDemandas()">
+                <option value="">Todas as Prioridades</option>
+                <option value="Alta">Alta Prioridade</option>
+                <option value="Média">Média Prioridade</option>
+                <option value="Baixa">Baixa Prioridade</option>
+              </select>
+              <select class="form-select" id="filtroDemandaBairro" onchange="renderDemandas()">
+                <option value="">Todos os Bairros</option>
+              </select>
+              <div class="search-input-wrap">
+                <i>🔍</i>
+                <input type="text" class="form-input" id="searchDemandaInput" placeholder="Buscar por título, solicitante, bairro..." oninput="renderDemandas()">
+              </div>
+              <button class="btn btn-gold" onclick="abrirModalNovaDemanda()">+ Nova Demanda</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportarDemandasCSV()">📥 Exportar CSV</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th style="width:90px;">Prioridade</th>
+                  <th>Título da Demanda</th>
+                  <th>Categoria</th>
+                  <th>Bairro / Comunidade</th>
+                  <th>Liderança Articuladora</th>
+                  <th>Solicitante / Contato</th>
+                  <th>Status Atual</th>
+                  <th>Data Abertura</th>
+                  <th>Previsão / Conclusão</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="demandasTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           4.3. VIEW: DISPARADOR TERRITORIAL WHATSAPP (SEMI-AUTOMÁTICO NATIVO)
+           ==================================================================== -->
+      <section class="view-panel" id="view-whatsapp">
+        <!-- Hero Banner Disparador -->
+        <div class="whatsapp-hero-banner">
+          <div class="whatsapp-hero-content">
+            <div class="whatsapp-hero-badge">
+              <span class="wpp-dot-pulse"></span>
+              <span>COMUNICAÇÃO TERRITORIAL DIRETA • MODO HUMANIZADO</span>
+            </div>
+            <h2>Disparador Territorial via WhatsApp</h2>
+            <p>Envio em massa assistido com tags dinâmicas ({nome}, {bairro}, {secao}, {lideranca}), validação automática de DDD/número e intervalos inteligentes anti-bloqueio.</p>
+          </div>
+          <div class="whatsapp-hero-meta">
+            <div class="wpp-meta-pill">
+              <span>🛡️ Zero Risco de Ban</span>
+            </div>
+            <div class="wpp-meta-pill">
+              <span>⚡ Sem Custo de Servidor/API</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- KPIs Rápidos do Disparador -->
+        <div class="tse-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+          <div class="tse-kpi-card">
+            <div class="tse-kpi-label">Fila Carregada</div>
+            <div class="tse-kpi-value" id="wppKpiFilaTotal" style="color:var(--emerald-400);">0</div>
+            <div class="tse-kpi-sub">Eleitores aptos com WhatsApp</div>
+          </div>
+          <div class="tse-kpi-card gold">
+            <div class="tse-kpi-label">Progresso Atual</div>
+            <div class="tse-kpi-value" id="wppContadorProgresso">0 de 0</div>
+            <div class="tse-kpi-sub">
+              <div class="wpp-progress-track">
+                <div class="wpp-progress-bar" id="wppBarraProgresso" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="tse-kpi-card">
+            <div class="tse-kpi-label">Mensagens Enviadas Hoje</div>
+            <div class="tse-kpi-value" id="wppKpiEnviadasHoje" style="color:#25D366;">0</div>
+            <div class="tse-kpi-sub">Registradas no histórico seguro</div>
+          </div>
+          <div class="tse-kpi-card">
+            <div class="tse-kpi-label">Intervalo de Segurança</div>
+            <div class="tse-kpi-value" style="color:var(--gold-400);">5s</div>
+            <div class="tse-kpi-sub">Anti-spam humanizado</div>
+          </div>
+        </div>
+
+        <!-- Painel Principal em 2 Colunas -->
+        <div class="wpp-dashboard-grid">
+          
+          <!-- Coluna 1: Segmentação e Editor de Mensagem -->
+          <div class="wpp-panel-card">
+            <div class="wpp-card-header">
+              <div class="wpp-card-title">
+                <span>⚙️ 1. Filtros de Segmentação da Campanha</span>
+              </div>
+            </div>
+            <div class="wpp-filter-grid">
+              <div class="form-group">
+                <label class="form-label">Bairro / Comunidade</label>
+                <select class="form-control" id="wppFiltroBairro" onchange="WhatsAppDispatcher.aplicarFiltrosInterface()">
+                  <option value="">Todos os Bairros</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Liderança Responsável</label>
+                <select class="form-control" id="wppFiltroLideranca" onchange="WhatsAppDispatcher.aplicarFiltrosInterface()">
+                  <option value="">Todas as Lideranças</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Seção Eleitoral</label>
+                <select class="form-control" id="wppFiltroSecao" onchange="WhatsAppDispatcher.aplicarFiltrosInterface()">
+                  <option value="">Todas as 16 Seções</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Busca Nominal</label>
+                <input type="text" class="form-control" id="wppSearchInput" placeholder="Nome, telefone, rua..." oninput="WhatsAppDispatcher.aplicarFiltrosInterface()">
+              </div>
+            </div>
+            <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-muted); cursor: pointer;">
+                <input type="checkbox" id="wppCheckNaoContatados" onchange="WhatsAppDispatcher.aplicarFiltrosInterface()">
+                <span>Apenas eleitores ainda não contatados hoje</span>
+              </label>
+              <button class="btn btn-secondary btn-sm" onclick="WhatsAppDispatcher.aplicarFiltrosInterface()">🔄 Atualizar Fila</button>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 20px 0;">
+
+            <div class="wpp-card-header" style="margin-bottom: 12px;">
+              <div class="wpp-card-title">
+                <span>📝 2. Compositor de Mensagem</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="WhatsAppDispatcher.salvarNovoTemplateModal()">💾 Salvar Modelo</button>
+            </div>
+
+            <!-- Seletor de Modelo Pronto -->
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label class="form-label">Modelos Prontos de Mensagem:</label>
+              <select class="form-control" id="wppSelectTemplate" onchange="WhatsAppDispatcher.aplicarTemplate(this.value)">
+                <option value="">-- Selecione um modelo pronto --</option>
+              </select>
+            </div>
+
+            <!-- Tags Dinâmicas -->
+            <div class="wpp-tags-bar">
+              <span class="wpp-tags-label">Inserir Tag:</span>
+              <button type="button" class="wpp-tag-btn" onclick="WhatsAppDispatcher.inserirTagNoEditor('{primeiro_nome}')" title="Insere o primeiro nome do eleitor">{primeiro_nome}</button>
+              <button type="button" class="wpp-tag-btn" onclick="WhatsAppDispatcher.inserirTagNoEditor('{nome}')" title="Insere o nome completo">{nome}</button>
+              <button type="button" class="wpp-tag-btn" onclick="WhatsAppDispatcher.inserirTagNoEditor('{bairro}')" title="Insere o bairro do eleitor">{bairro}</button>
+              <button type="button" class="wpp-tag-btn" onclick="WhatsAppDispatcher.inserirTagNoEditor('{secao}')" title="Insere o número da seção eleitoral">{secao}</button>
+              <button type="button" class="wpp-tag-btn" onclick="WhatsAppDispatcher.inserirTagNoEditor('{lideranca}')" title="Insere a liderança do eleitor">{lideranca}</button>
+              <button type="button" class="wpp-tag-btn" onclick="WhatsAppDispatcher.inserirTagNoEditor('{rua}')" title="Insere a rua cadastrada">{rua}</button>
+              <button type="button" class="wpp-tag-btn" onclick="WhatsAppDispatcher.inserirTagNoEditor('{saudacao}')" title="Sorteia saudação">{saudacao}</button>
+            </div>
+
+            <!-- Textarea do Editor -->
+            <div class="form-group" style="margin-top: 10px;">
+              <textarea class="form-control wpp-textarea" id="wppEditorMensagem" rows="5" placeholder="Digite sua mensagem aqui... Use as tags acima para personalizar automaticamente cada envio." oninput="WhatsAppDispatcher.atualizarPreviewMensagem(WhatsAppDispatcher.state.queue[WhatsAppDispatcher.state.currentIndex])"></textarea>
+            </div>
+            
+            <div class="wpp-editor-footer">
+              <span style="font-size: 0.75rem; color: var(--text-dim);">💡 Dica: Variar saudações e usar o primeiro nome reduz drasticamente o risco de bloqueio.</span>
+            </div>
+          </div>
+
+          <!-- Coluna 2: Fila, Contato Atual em Foco e Preview WhatsApp -->
+          <div class="wpp-panel-card">
+            <div class="wpp-card-header">
+              <div class="wpp-card-title">
+                <span>💬 3. Envio Assistido & Pré-visualização</span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="WhatsAppDispatcher.reiniciarFila()" title="Reiniciar do primeiro contato">🔄 Reiniciar</button>
+                <button class="btn btn-secondary btn-sm" onclick="WhatsAppDispatcher.exportarRelatorioEnviosCSV()" title="Exportar histórico">📥 Relatório</button>
+              </div>
+            </div>
+
+            <!-- Card do Contato em Foco -->
+            <div id="wppBoxContatoAtual" class="wpp-focus-card">
+              <div class="wpp-focus-header">
+                <div>
+                  <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Destinatário em Foco</span>
+                  <h4 id="wppFocoNome" style="color: #ffffff; margin: 2px 0 0 0; font-size: 1.05rem;">Carregando...</h4>
+                </div>
+                <span id="wppFocoStatusBadge" class="badge-status pendente">⏳ Pendente</span>
+              </div>
+
+              <div class="wpp-focus-details">
+                <div>
+                  <span class="wpp-detail-label">WhatsApp:</span>
+                  <strong id="wppFocoTelefone" style="color: var(--emerald-400); font-family: var(--font-mono);">-</strong>
+                </div>
+                <div>
+                  <span class="wpp-detail-label">Bairro:</span>
+                  <strong id="wppFocoBairro">-</strong>
+                </div>
+                <div>
+                  <span class="wpp-detail-label">Local:</span>
+                  <strong id="wppFocoSecao">-</strong>
+                </div>
+                <div>
+                  <span class="wpp-detail-label">Liderança:</span>
+                  <strong id="wppFocoLider" style="color: var(--gold-400);">-</strong>
+                </div>
+              </div>
+
+              <!-- Simulação de Balão do WhatsApp -->
+              <div class="wpp-chat-mockup">
+                <div class="wpp-chat-balloon">
+                  <div class="wpp-balloon-text" id="wppChatPreviewBody">...</div>
+                  <div class="wpp-balloon-meta">
+                    <span id="wppChatPreviewHora">12:00</span>
+                    <span class="wpp-ticks">✓✓</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contagem Anti-Bloqueio -->
+              <div id="wppAutoCountdownBox" class="wpp-countdown-box" style="display:none;">
+                <div class="wpp-countdown-spinner"></div>
+                <span id="wppBtnAutoCountdown">Aguardando intervalo anti-bloqueio...</span>
+              </div>
+
+              <!-- Ações Principais do Contato -->
+              <div class="wpp-actions-group">
+                <button type="button" class="btn btn-secondary" onclick="WhatsAppDispatcher.voltarParaAnterior()" title="Voltar contato anterior">◀ Anterior</button>
+                <button type="button" class="btn wpp-btn-enviar" id="wppBtnEnviarPrincipal" onclick="WhatsAppDispatcher.enviarContatoAtual()">
+                  <span>🚀 Abrir WhatsApp</span>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="WhatsAppDispatcher.pularContatoAtual()" title="Pular este contato">Pular ⏭️</button>
+              </div>
+            </div>
+
+            <!-- Card de Fim de Fila (quando todos forem enviados) -->
+            <div id="wppBoxFimFila" class="wpp-empty-state" style="display:none;">
+              <div style="font-size: 2.5rem; margin-bottom: 8px;">🎉</div>
+              <h3 style="color: var(--emerald-400); margin-bottom: 6px;">Fila de Disparos Concluída!</h3>
+              <p style="color: var(--text-muted); font-size: 0.85rem;">Todos os eleitores da lista atual foram processados com sucesso.</p>
+              <div style="margin-top: 14px; display: flex; gap: 10px; justify-content: center;">
+                <button class="btn btn-primary btn-sm" onclick="WhatsAppDispatcher.reiniciarFila()">🔄 Reenviar / Reiniciar Fila</button>
+                <button class="btn btn-secondary btn-sm" onclick="WhatsAppDispatcher.exportarRelatorioEnviosCSV()">📥 Baixar Relatório em CSV</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela Completa da Fila de Disparo -->
+        <div class="card-section" style="margin-top: 20px;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>📋 Lista da Fila de Disparos</h3>
+              <p>Clique em qualquer eleitor para colocá-lo em foco ou acompanhe a situação de cada envio</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">#</th>
+                  <th>Nome do Eleitor</th>
+                  <th>Telefone / WhatsApp</th>
+                  <th>Bairro / Comunidade</th>
+                  <th>Seção Eleitoral</th>
+                  <th>Status do Envio</th>
+                </tr>
+              </thead>
+              <tbody id="wppTabelaFilaBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           5. VIEW: MAPEAMENTO DAS SEÇÕES ELEITORAIS
+           ==================================================================== -->
+      <section class="view-panel" id="view-secoes">
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Mapeamento Oficial de Seções (8ª Zona Eleitoral)</h3>
+              <p>Conferência de colégios eleitorais e número de eleitores aptos em Riachuelo–RN</p>
+            </div>
+            <div class="section-actions">
+              <select class="form-select" id="filtroLocalSecao" onchange="renderSecoes()">
+                <option value="">Todos os Locais de Votação</option>
+              </select>
+              <select class="form-select" id="filtroStatusSecao" onchange="renderSecoes()">
+                <option value="">Todas as Situações</option>
+                <option value="Oficial TSE">Oficial TSE</option>
+                <option value="Pendente de Validação">Pendente de Validação</option>
+              </select>
+              <button class="btn btn-gold" onclick="abrirModalNovaSecao()">+ Mapear Seção</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th>Seção</th>
+                  <th>Zona</th>
+                  <th>Local de Votação / Endereço</th>
+                  <th>Comunidade Atendida</th>
+                  <th>Eleitores Aptos</th>
+                  <th>Comparecimento</th>
+                  <th>Abstenção</th>
+                  <th>Histórico TSE</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="secoesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           6. VIEW: RESULTADOS E ESTATÍSTICAS OFICIAIS DO TSE (2014 A 2026)
+           ==================================================================== -->
+      <section class="view-panel" id="view-resultados">
+        <!-- Barra de Seleção de Anos (2014 a 2026) -->
+        <div class="tse-filter-bar">
+          <div style="font-weight:700; color:#ffffff; font-size:0.85rem; display:flex; align-items:center; gap:6px;">
+            <span>📅 Eleições Oficiais TSE:</span>
+          </div>
+          <div class="tse-year-chips" id="tseYearChipsContainer">
+            <button class="tse-chip projecao" data-year="2026" onclick="selecionarAnoTSE(2026)">2026 (Projeção Bacurau)</button>
+            <button class="tse-chip active" data-year="2024" onclick="selecionarAnoTSE(2024)">2024 (Municipal)</button>
+            <button class="tse-chip" data-year="2022" onclick="selecionarAnoTSE(2022)">2022 (Geral)</button>
+            <button class="tse-chip" data-year="2020" onclick="selecionarAnoTSE(2020)">2020 (Municipal)</button>
+            <button class="tse-chip" data-year="2018" onclick="selecionarAnoTSE(2018)">2018 (Geral)</button>
+            <button class="tse-chip" data-year="2016" onclick="selecionarAnoTSE(2016)">2016 (Municipal)</button>
+            <button class="tse-chip" data-year="2014" onclick="selecionarAnoTSE(2014)">2014 (Geral)</button>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3 id="tseResultadosHeaderTitle">Resultados Oficiais do TSE — Eleições 2024</h3>
+              <p id="tseResultadosHeaderSubtitle">Votos nominais por seção eleitoral de Riachuelo–RN e estatísticas de cada candidato</p>
+            </div>
+            <div class="section-actions">
+              <select class="form-select" id="filtroResultadoCargo" onchange="aoMudarFiltrosTSE()">
+                <option value="Prefeito">Prefeito</option>
+                <option value="Vereador">Vereador</option>
+              </select>
+              <select class="form-select" id="filtroResultadoSecao" onchange="aoMudarFiltrosTSE()">
+                <option value="">Todas as 16 Seções</option>
+              </select>
+              <div class="search-input-wrap">
+                <i>🔍</i>
+                <input type="text" class="form-input" id="searchTseInput" placeholder="Buscar candidato, seção ou colégio..." oninput="aoMudarFiltrosTSE()">
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="exportarRelatorioTSECSV()">📥 Exportar Dados</button>
+            </div>
+          </div>
+
+          <!-- Cards de Indicadores Rápidos da Eleição e Seção Selecionada -->
+          <div class="tse-kpi-grid" id="tseKpiGrid">
+            <div class="tse-kpi-card gold">
+              <div class="tse-kpi-label">Vencedor Geral / Líder</div>
+              <div class="tse-kpi-value" id="kpiTseVencedor">-</div>
+              <div class="tse-kpi-sub" id="kpiTseVencedorSub">Votos e Percentual Válidos</div>
+            </div>
+            <div class="tse-kpi-card">
+              <div class="tse-kpi-label">Comparecimento Eleitoral</div>
+              <div class="tse-kpi-value" id="kpiTseComparecimento">-</div>
+              <div class="tse-kpi-sub" id="kpiTseComparecimentoSub">Eleitores presentes às urnas</div>
+            </div>
+            <div class="tse-kpi-card blue">
+              <div class="tse-kpi-label">Votos Válidos Nominais</div>
+              <div class="tse-kpi-value" id="kpiTseValidos">-</div>
+              <div class="tse-kpi-sub" id="kpiTseValidosSub">Excluindo brancos e nulos</div>
+            </div>
+            <div class="tse-kpi-card">
+              <div class="tse-kpi-label">Taxa de Abstenção</div>
+              <div class="tse-kpi-value" id="kpiTseAbstencao">-</div>
+              <div class="tse-kpi-sub" id="kpiTseAbstencaoSub">Ausências registradas</div>
+            </div>
+          </div>
+
+          <!-- Tabela de Resultados por Seção com Barras de Candidatos -->
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th style="min-width:140px;">Seção / Colégio</th>
+                  <th>Comunidade</th>
+                  <th style="min-width:260px;">1º Colocado na Seção</th>
+                  <th style="min-width:220px;">2º Colocado na Seção</th>
+                  <th>Vantagem</th>
+                  <th>Comparecimento</th>
+                  <th>Ações & Raio-X</th>
+                </tr>
+              </thead>
+              <tbody id="resultadosTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           7. VIEW: GRÁFICOS & ESTATÍSTICAS PREMIUM
+           ==================================================================== -->
+      <section class="view-panel" id="view-estatisticas">
+        <div class="section-header" style="margin-bottom:20px;">
+          <div class="section-title-wrap">
+            <h3>Inteligência Estatística & Análise Comparativa</h3>
+            <p>Cruzamento de dados eleitorais agregados de Riachuelo–RN</p>
+          </div>
+          <div class="section-actions">
+            <select class="form-select" id="filtroGraficoAno" onchange="renderEstatisticas()">
+              <option value="2026">Ano 2026 (Projeção Bacurau)</option>
+              <option value="2024" selected>Ano 2024 (Municipal)</option>
+              <option value="2022">Ano 2022 (Geral)</option>
+              <option value="2020">Ano 2020 (Municipal)</option>
+              <option value="2018">Ano 2018 (Geral)</option>
+              <option value="2016">Ano 2016 (Municipal)</option>
+              <option value="2014">Ano 2014 (Geral)</option>
+            </select>
+            <select class="form-select" id="filtroGraficoCargo" onchange="renderEstatisticas()">
+              <option value="Prefeito">Cargo: Prefeito</option>
+              <option value="Vereador">Cargo: Vereador</option>
+              <option value="Presidente">Cargo: Presidente</option>
+              <option value="Governador">Cargo: Governador</option>
+            </select>
+            <button class="btn btn-primary" onclick="exportarExcelRelatorioGeral()">📑 Exportar Excel (.xlsx)</button>
+            <button class="btn btn-secondary" onclick="imprimirRelatorioExecutivo()">🖨️ Imprimir / PDF</button>
+          </div>
+        </div>
+
+        <div class="charts-grid-2">
+          <div class="chart-card">
+            <h4 style="font-size:1.05rem; color:#ffffff; font-weight:700; margin-bottom:14px;">Comparativo de Votação Nominal</h4>
+            <div class="chart-wrapper">
+              <canvas id="statsBarChart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <h4 style="font-size:1.05rem; color:#ffffff; font-weight:700; margin-bottom:14px;">Distribuição Percentual de Votos</h4>
+            <div class="chart-wrapper">
+              <canvas id="statsDoughnutChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="charts-grid-2">
+          <div class="chart-card">
+            <h4 style="font-size:1.05rem; color:#ffffff; font-weight:700; margin-bottom:14px;">Evolução Histórica Temporal</h4>
+            <div class="chart-wrapper">
+              <canvas id="statsLineChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ================================================================
+             RANKING TERRITORIAL OFICIAL DE CANDIDATOS (PAGINADO: MÁX 10/PÁG)
+             ================================================================ -->
+        <div class="card-section" id="blocoRankingTerritorial" style="margin-top:24px;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3 id="rankingTerritorialTitulo">🏆 Ranking Territorial Oficial de Candidatos (TSE)</h3>
+              <p id="rankingTerritorialSubtitulo">Votação nominal detalhada de cada Vereador, Governador e Deputado (Máx 10 por página)</p>
+            </div>
+            <div class="section-actions">
+              <select class="form-select" id="filtroRankingCargo" onchange="aoMudarFiltroRanking(1)">
+                <option value="Vereador">Cargo: Vereador</option>
+                <option value="Governador">Cargo: Governador</option>
+                <option value="Deputado Estadual">Cargo: Deputado Estadual</option>
+                <option value="Deputado Federal">Cargo: Deputado Federal</option>
+                <option value="Prefeito">Cargo: Prefeito</option>
+                <option value="Presidente">Cargo: Presidente</option>
+                <option value="Senador">Cargo: Senador</option>
+                <option value="">Todos os Cargos</option>
+              </select>
+              <select class="form-select" id="filtroRankingAno" onchange="aoMudarAnoRanking()">
+                <option value="2024" selected>Eleições 2024</option>
+                <option value="2022">Eleições 2022</option>
+                <option value="2020">Eleições 2020</option>
+                <option value="2018">Eleições 2018</option>
+                <option value="2016">Eleições 2016</option>
+                <option value="2014">Eleições 2014</option>
+                <option value="2026">Projeção 2026 (Bacurau)</option>
+              </select>
+              <div class="search-input-wrap">
+                <i>🔍</i>
+                <input type="text" class="form-input" id="searchRankingInput" placeholder="Buscar candidato ou partido..." oninput="aoMudarFiltroRanking(1)">
+              </div>
+            </div>
+          </div>
+
+          <!-- Barra de Navegação Horizontal com Botões para Rolar Lateralmente -->
+          <div class="table-scroll-banner">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:1.1rem;">↔️</span>
+              <span><strong>Navegação Lateral:</strong> Deslize ou use os botões ao lado para visualizar todas as colunas e ações da tabela</span>
+            </div>
+            <div class="table-scroll-buttons">
+              <button type="button" class="table-scroll-btn" onclick="rolarTabelaRanking('esquerda')" title="Rolar tabela para a esquerda">
+                ◀ Rolar Esquerda
+              </button>
+              <button type="button" class="table-scroll-btn" onclick="rolarTabelaRanking('direita')" title="Rolar tabela para a direita">
+                Rolar Direita ▶
+              </button>
+            </div>
+          </div>
+
+          <div class="table-responsive" id="rankingTableResponsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th style="width:70px;">Posição</th>
+                  <th>Candidato / Partido</th>
+                  <th>Cargo em Disputa</th>
+                  <th>Ano / Eleição</th>
+                  <th>Total de Votos (Riachuelo)</th>
+                  <th>% Válidos</th>
+                  <th>Pólo de Maior Votação (Seção Mais Forte)</th>
+                  <th>Situação</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="rankingTerritorialTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Barra de Paginação (Máx 10 por página) -->
+          <div class="tse-pagination-bar" id="rankingPaginationBar">
+            <div class="tse-pagination-info" id="rankingPaginationInfo">
+              Exibindo 1 a 10 de 0 candidatos
+            </div>
+            <div class="tse-pagination-controls" id="rankingPaginationControls">
+              <!-- Gerado dinamicamente: Anterior, Páginas, Próxima -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           7.1. VIEW: SIMULADOR ELEITORAL (QUOCIENTE & SOBRAS 80/20)
+           ==================================================================== -->
+      <section class="view-panel" id="view-simulador">
+        <!-- Cabeçalho do Simulador -->
+        <div class="card-section" style="margin-bottom:20px;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>🗳️ Simulador Estratégico de Quociente Eleitoral (QE) e Sobras 80/20</h3>
+              <p>Câmara Municipal de Riachuelo–RN • Regras Oficiais do Código Eleitoral (Lei 14.211/2021 e ADI 7228 STF)</p>
+            </div>
+            <div class="section-actions">
+              <button class="btn btn-gold" onclick="abrirModalNovoPartidoSimulador()">+ Adicionar Legenda</button>
+              <button class="btn btn-secondary btn-sm" onclick="resetarSimuladorPadrao()">🔄 Restaurar Padrão Riachuelo</button>
+              <button class="btn btn-secondary btn-sm" onclick="exportarSimuladorCSV()">📥 Exportar Simulação</button>
+            </div>
+          </div>
+
+          <!-- Grade de Parâmetros Gerais da Eleição -->
+          <div class="simulador-params-grid">
+            <div class="simulador-param-box">
+              <span class="simulador-param-label">Eleitores Aptos</span>
+              <div class="simulador-param-input-wrap">
+                <input type="number" class="simulador-param-input" id="simAptos" value="6245" onchange="aoAlterarParametrosSimulador()">
+              </div>
+            </div>
+            <div class="simulador-param-box">
+              <span class="simulador-param-label">Abstenção Projetada</span>
+              <div class="simulador-param-input-wrap">
+                <input type="number" step="0.1" class="simulador-param-input" id="simAbstencaoPct" value="14.5" onchange="aoAlterarParametrosSimulador()">
+                <span class="simulador-param-suffix">%</span>
+              </div>
+            </div>
+            <div class="simulador-param-box">
+              <span class="simulador-param-label">Brancos / Nulos</span>
+              <div class="simulador-param-input-wrap">
+                <input type="number" step="0.1" class="simulador-param-input" id="simBrancosNulosPct" value="4.2" onchange="aoAlterarParametrosSimulador()">
+                <span class="simulador-param-suffix">%</span>
+              </div>
+            </div>
+            <div class="simulador-param-box">
+              <span class="simulador-param-label">Vagas na Câmara</span>
+              <div class="simulador-param-input-wrap">
+                <input type="number" class="simulador-param-input" id="simCadeiras" value="9" min="1" max="55" onchange="aoAlterarParametrosSimulador()">
+                <span class="simulador-param-suffix">Vagas</span>
+              </div>
+            </div>
+            <div class="simulador-param-box">
+              <span class="simulador-param-label">Cláusula QP (Indiv.)</span>
+              <div class="simulador-param-input-wrap">
+                <input type="number" step="1" class="simulador-param-input" id="simClausulaIndivPct" value="10" onchange="aoAlterarParametrosSimulador()">
+                <span class="simulador-param-suffix">% QE</span>
+              </div>
+            </div>
+            <div class="simulador-param-box">
+              <span class="simulador-param-label">Cláusula Sobra Partido</span>
+              <div class="simulador-param-input-wrap">
+                <input type="number" step="1" class="simulador-param-input" id="simClausulaSobrasPartPct" value="80" onchange="aoAlterarParametrosSimulador()">
+                <span class="simulador-param-suffix">% QE</span>
+              </div>
+            </div>
+            <div class="simulador-param-box">
+              <span class="simulador-param-label">Cláusula Sobra Cand.</span>
+              <div class="simulador-param-input-wrap">
+                <input type="number" step="1" class="simulador-param-input" id="simClausulaSobrasCandPct" value="20" onchange="aoAlterarParametrosSimulador()">
+                <span class="simulador-param-suffix">% QE</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Indicadores Chave Calculados do QE -->
+        <div class="tse-kpi-grid">
+          <div class="tse-kpi-card gold">
+            <div class="tse-kpi-label">Quociente Eleitoral (QE)</div>
+            <div class="tse-kpi-value" id="kpiSimQE">0</div>
+            <div class="tse-kpi-sub" id="kpiSimQESub">Votos válidos para 1 vaga direta</div>
+          </div>
+          <div class="tse-kpi-card blue">
+            <div class="tse-kpi-label">Votos Válidos Projetados</div>
+            <div class="tse-kpi-value" id="kpiSimValidos">0</div>
+            <div class="tse-kpi-sub" id="kpiSimValidosSub">Soma dos partidos participantes</div>
+          </div>
+          <div class="tse-kpi-card">
+            <div class="tse-kpi-label">Piso QP Direto (10% QE)</div>
+            <div class="tse-kpi-value" id="kpiSimPisoQP">0</div>
+            <div class="tse-kpi-sub">Voto mínimo do candidato eleito</div>
+          </div>
+          <div class="tse-kpi-card">
+            <div class="tse-kpi-label">Piso Sobras 80/20</div>
+            <div class="tse-kpi-value" id="kpiSimPisoSobras">0 / 0</div>
+            <div class="tse-kpi-sub">80% Legenda / 20% Candidato</div>
+          </div>
+        </div>
+
+        <!-- Visualização das 9 Cadeiras da Câmara -->
+        <div class="hemiciclo-bar-wrap">
+          <div class="hemiciclo-header">
+            <div>
+              <h4 style="font-size:1.05rem; color:#ffffff; margin:0 0 4px;">🏛️ Composição Projetada das 9 Cadeiras da Câmara</h4>
+              <p style="font-size:0.78rem; color:var(--text-muted); margin:0;">Riachuelo–RN • Distribuição imediata entre Vagas Diretas (QP) e Sobras Eleitorais (Médias)</p>
+            </div>
+            <div style="display:flex; gap:12px; font-size:0.8rem;">
+              <span style="display:flex; align-items:center; gap:6px;"><span class="cadeira-tipo qp">QP</span> Vaga Direta</span>
+              <span style="display:flex; align-items:center; gap:6px;"><span class="cadeira-tipo sobra">SOBRA</span> Maior Média</span>
+            </div>
+          </div>
+
+          <div class="cadeiras-grid" id="simCadeirasGrid">
+            <!-- 9 caixas renderizadas dinamicamente -->
+          </div>
+        </div>
+
+        <!-- Grade de Partidos com Edição de Votos em Tempo Real -->
+        <div class="card-section" style="margin-top:20px;">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Partidos e Votação Projetada (Edição Instantânea)</h3>
+              <p>Altere os votos abaixo para ver o recálculo imediato de quem ganha ou perde cadeiras</p>
+            </div>
+          </div>
+
+          <div class="partidos-simulador-grid" id="simPartidosGrid">
+            <!-- Renderizado dinamicamente -->
+          </div>
+        </div>
+
+        <!-- Trilha de Rodadas de Sobras & Radar de Oportunidades -->
+        <div class="charts-grid-2" style="margin-top:24px;">
+          <div class="card-section">
+            <div class="section-header">
+              <div class="section-title-wrap">
+                <h4>📐 Auditoria das Rodadas de Sobras (Maiores Médias)</h4>
+                <p>Passo a passo com a fórmula oficial: Votos / (Cadeiras + 1)</p>
+              </div>
+            </div>
+            <div class="sobras-timeline" id="simSobrasTimeline">
+              <!-- Rodadas renderizadas dinamicamente -->
+            </div>
+          </div>
+
+          <div class="card-section">
+            <div class="section-header">
+              <div class="section-title-wrap">
+                <h4>🎯 Radar de Oportunidades & Votos Faltantes</h4>
+                <p>Diferença exata de votos para puxar mais 1 vaga de vereador</p>
+              </div>
+            </div>
+            <div id="simRadarInsightsList">
+              <!-- Insights calculados dinamicamente -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           8. VIEW: CADASTRO ADMINISTRATIVO RESTRITO (LGPD)
+           ==================================================================== -->
+      <section class="view-panel" id="view-lgpd">
+        <div class="lgpd-banner">
+          <i>🛡️</i>
+          <div>
+            <strong style="color:#ffffff; font-size:0.95rem;">Conformidade Estrita com a Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)</strong>
+            <p>O RADAR BACURAU opera com dados exclusivamente agregados. <strong>É terminantemente vedado</strong> o armazenamento de títulos eleitorais individuais, segredos de voto ou inferências de preferência política pessoal. Os registros abaixo são estritamente administrativos para comunicação institucional e articulação comunitária.</p>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Cadastros Administrativos Restritos</h3>
+              <p>Identificadores internos, base legal e prazo de retenção definido</p>
+            </div>
+            <div class="section-actions">
+              <div class="search-input-wrap">
+                <i>🔍</i>
+                <input type="text" class="form-input" id="searchLgpdInput" placeholder="Buscar identificador..." oninput="renderLgpd()">
+              </div>
+              <button class="btn btn-gold" onclick="abrirModalNovoLgpd()">+ Novo Registro Restrito</button>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th>Código Interno</th>
+                  <th>Referência / Função</th>
+                  <th>Comunidade</th>
+                  <th>Finalidade de Tratamento</th>
+                  <th>Base Legal (LGPD)</th>
+                  <th>Situação</th>
+                  <th>Retenção</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="lgpdTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           9. VIEW: AUDITORIA & LOGS
+           ==================================================================== -->
+      <section class="view-panel" id="view-auditoria">
+        <div class="card-section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h3>Trilha de Auditoria e Segurança</h3>
+              <p>Registro cronológico e imutável de todas as operações administrativas</p>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="renderAuditoria()">Atualizar Trilha</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="radar-table">
+              <thead>
+                <tr>
+                  <th>Data / Hora</th>
+                  <th>Usuário Responsável</th>
+                  <th>Ação Executada</th>
+                  <th>Módulo / Entidade</th>
+                  <th>Detalhamento da Operação</th>
+                  <th>IP de Origem</th>
+                </tr>
+              </thead>
+              <tbody id="auditoriaTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           10. VIEW: CONFIGURAÇÕES E BACKUP
+           ==================================================================== -->
+      <section class="view-panel" id="view-configuracoes">
+        <div class="charts-grid-2">
+          <div class="card-section">
+            <div class="section-header">
+              <div class="section-title-wrap">
+                <h3>Backup e Integridade da Base</h3>
+                <p>Exportação e recuperação completa em formato JSON estruturado</p>
+              </div>
+            </div>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:18px;">
+              Última sincronização: <strong id="cfgDataSync" style="color:var(--emerald-400);">...</strong><br>
+              Total de registros: <strong id="cfgTotalRegistros">...</strong>
+            </p>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <button class="btn btn-gold" onclick="exportarBackupDatabase()">
+                💾 Baixar Arquivo de Backup Completo (JSON)
+              </button>
+              <button class="btn btn-secondary" onclick="dispararUploadBackup()">
+                📂 Restaurar Backup a partir de Arquivo
+              </button>
+              <input type="file" id="backupFileInput" accept=".json" style="display:none;" onchange="carregarArquivoBackup(event)">
+              <button class="btn btn-secondary" style="color:var(--status-pendente); border-color:var(--status-pendente);" onclick="resetarBaseDadosPadrao()">
+                ⚠️ Restaurar Dados Oficiais Padrão de Riachuelo
+              </button>
+            </div>
+          </div>
+
+          <div class="card-section">
+            <div class="section-header">
+              <div class="section-title-wrap">
+                <h3>Usuários e Níveis de Permissão (RBAC)</h3>
+                <p>Controle de credenciais, senhas e perfis autorizados</p>
+              </div>
+              <button class="btn btn-gold btn-sm" onclick="abrirModalNovoUsuario()">
+                + Cadastrar Login & Senha
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="radar-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Login (Usuário)</th>
+                    <th>E-mail</th>
+                    <th>Perfil (RBAC)</th>
+                    <th>Status</th>
+                    <th>Último Acesso</th>
+                    <th style="text-align:right;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="usuariosConfigTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card de Conexão com Banco em Nuvem (Supabase Realtime) -->
+        <div class="card-section" style="margin-top: 24px; border: 1px solid rgba(16, 185, 129, 0.4); background: linear-gradient(135deg, rgba(7, 23, 16, 0.85) 0%, rgba(4, 13, 9, 0.95) 100%);">
+          <div class="section-header" style="flex-wrap: wrap; gap: 12px;">
+            <div class="section-title-wrap">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:1.3rem;">☁️</span>
+                <h3 style="margin:0;">Banco de Dados em Nuvem (Supabase Realtime)</h3>
+                <span class="badge-status oficial" style="font-size:0.7rem;">Multi-Aparelhos</span>
+              </div>
+              <p style="margin-top:4px;">Permite que várias lideranças cadastrem eleitores pelo celular e você acompanhe tudo em tempo real pelo seu computador.</p>
+            </div>
+            <div id="supabaseConfigStatusMsg">
+              <span style="color:var(--text-muted);">⚪ Operando no modo local</span>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin: 18px 0;">
+            <div class="form-group">
+              <label class="form-label">Supabase Project URL *</label>
+              <input type="text" class="form-control" id="cfgSupabaseUrl" placeholder="https://xyzcompany.supabase.co" autocomplete="off">
+              <span style="font-size:0.72rem; color:var(--text-dim); display:block; margin-top:4px;">Encontrada no painel Supabase: <em>Project Settings > API > Project URL</em></span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Supabase Anon Key (Chave Pública) *</label>
+              <input type="password" class="form-control" id="cfgSupabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off">
+              <span style="font-size:0.72rem; color:var(--text-dim); display:block; margin-top:4px;">Chave anônima pública do cliente: <em>Project Settings > API > Project API keys (anon public)</em></span>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding-top:10px; border-top:1px solid var(--border-subtle);">
+            <button class="btn btn-gold" id="btnSalvarCfgSupabase" onclick="salvarConfiguracaoSupabase()">
+              ⚡ Salvar e Conectar Supabase
+            </button>
+            <button class="btn btn-primary" onclick="SupabaseClient.enviarTodosDadosLocaisParaNuvem()" title="Envia todos os eleitores cadastrados neste computador para o Supabase">
+              ⬆️ Subir Dados Locais para Nuvem
+            </button>
+            <button class="btn btn-secondary" onclick="SupabaseClient.sincronizarTudo()" title="Puxa os dados mais recentes cadastrados pela equipe na nuvem">
+              🔄 Sincronizar Agora
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="desconectarSupabase()" style="color:#ef4444; border-color:#ef4444; margin-left:auto;">
+              Desconectar Nuvem
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ========================================================================
+     MODAIS DE CADASTRO E EDIÇÃO
+     ======================================================================== -->
+
+<!-- Modal: Comunidade -->
+<div class="modal-overlay" id="modalComunidade">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 id="modalComunidadeTitle">Cadastrar Localidade</h3>
+      <button class="modal-close" onclick="closeModal('modalComunidade')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="formComunidadeId">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Nome da Comunidade / Bairro *</label>
+          <input type="text" class="form-control" id="formComunidadeNome" placeholder="Ex: Assentamento Furnas, Alto da Boa Vista">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de Localidade *</label>
+          <select class="form-control" id="formComunidadeTipo">
+            <option value="Bairro Urbano / Sede">Bairro Urbano / Sede</option>
+            <option value="Bairro Urbano">Bairro Urbano</option>
+            <option value="Assentamento Rural - INCRA">Assentamento Rural - INCRA</option>
+            <option value="Comunidade Rural">Comunidade Rural</option>
+            <option value="Sítio Rural">Sítio Rural</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Situação da Conferência *</label>
+          <select class="form-control" id="formComunidadeStatus">
+            <option value="Oficial Confirmado">Oficial Confirmado</option>
+            <option value="Pendente de Validação">Pendente de Validação</option>
+          </select>
+        </div>
+        <div class="form-group full" style="background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.35); border-radius:var(--radius-md); padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <span style="font-weight:700; color:var(--emerald-400); font-size:0.88rem; display:block;">📍 Escolher Ponto no Mapa</span>
+            <span style="font-size:0.75rem; color:var(--text-muted);" id="formComunidadeCoordsHint">Marque o ponto exato das casas e ruas diretamente no satélite</span>
+          </div>
+          <button type="button" class="btn btn-gold btn-sm" onclick="iniciarSelecaoPontoNoMapa()" title="Fecha o modal para você clicar onde fica a comunidade no mapa">
+            🗺️ Marcar no Mapa
+          </button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Latitude GPS</label>
+          <input type="number" step="0.00001" class="form-control" id="formComunidadeLat" value="-5.8153">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Longitude GPS</label>
+          <input type="number" step="0.00001" class="form-control" id="formComunidadeLng" value="-35.8239">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Eleitorado Estimado</label>
+          <input type="number" class="form-control" id="formComunidadeEleitores" value="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Liderança Responsável</label>
+          <select class="form-control" id="formComunidadeLideranca"></select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Observações Administrativas</label>
+          <textarea class="form-control" id="formComunidadeObs" placeholder="Informações de infraestrutura, limites territoriais ou notas de campo..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalComunidade')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarFormComunidade()">Salvar Localidade</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Liderança -->
+<div class="modal-overlay" id="modalLideranca">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 id="modalLiderancaTitle">Cadastrar Liderança</h3>
+      <button class="modal-close" onclick="closeModal('modalLideranca')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="formLiderancaId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Nome Completo *</label>
+          <input type="text" class="form-control" id="formLiderancaNome" placeholder="Ex: José Francisco das Chagas">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Apelido / Como é Conhecido</label>
+          <input type="text" class="form-control" id="formLiderancaApelido" placeholder="Ex: Zé do Assentamento">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefone / WhatsApp</label>
+          <input type="text" class="form-control" id="formLiderancaTelefone" placeholder="(84) 99999-9999">
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input type="email" class="form-control" id="formLiderancaEmail" placeholder="lider@exemplo.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cargo / Papel Territorial</label>
+          <input type="text" class="form-control" id="formLiderancaCargo" placeholder="Ex: Presidente da Associação">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Situação Cadastral</label>
+          <select class="form-control" id="formLiderancaStatus">
+            <option value="Ativo">Ativo</option>
+            <option value="Inativo">Inativo / Afastado</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data Início da Responsabilidade</label>
+          <input type="date" class="form-control" id="formLiderancaDataInicio">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Data Término (se houver)</label>
+          <input type="date" class="form-control" id="formLiderancaDataFim">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Comunidades Vinculadas (Localidade Determinada) *</label>
+          <div id="formLiderancaComunidadesContainer" style="max-height:140px; overflow-y:auto; border:1px solid var(--border-subtle); padding:10px; border-radius:8px; background:var(--bg-input);"></div>
+          <small style="color:var(--text-muted); font-size:0.75rem; display:block; margin-top:4px;">Selecione o bairro/localidade que esta liderança terá acesso exclusivo no mapa.</small>
+        </div>
+
+        <!-- Seção: Credenciais de Acesso da Liderança (Login & Senha) -->
+        <div class="form-group full" style="background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.35); border-radius:var(--radius-md); padding:14px; margin-top:4px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <span style="font-size:1.25rem;">🔑</span>
+            <div>
+              <strong style="color:var(--emerald-400); font-size:0.9rem; display:block;">Credenciais de Acesso da Liderança (Login & Senha)</strong>
+              <span style="color:var(--text-muted); font-size:0.75rem; display:block;">Com este acesso, a liderança vê exclusivamente o <strong>Mapa</strong> do seu local determinado (sem outros perímetros), o <strong>Ranking TSE</strong> e as <strong>Demandas</strong>.</span>
+            </div>
+          </div>
+          <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap:12px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Usuário / Login *</label>
+              <input type="text" class="form-control" id="formLiderancaLogin" placeholder="Ex: lider.centro" autocomplete="off">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">Senha de Acesso *</label>
+              <div class="password-input-wrap">
+                <input type="password" class="form-control" id="formLiderancaSenha" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+                <button type="button" class="btn-toggle-pwd" onclick="alternarVisibilidadeSenha('formLiderancaSenha', this)" title="Ver senha">👁️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group full">
+          <label class="form-label">Observações Administrativas</label>
+          <textarea class="form-control" id="formLiderancaObs" placeholder="Anotações sobre a atuação e histórico comunitário..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+      <button type="button" class="btn btn-secondary" id="btnExcluirLiderancaModal" style="color:#ef4444; border-color:rgba(239,68,68,0.4); display:none;" onclick="excluirLiderancaPeloModal()">
+        🗑️ Remover Liderança
+      </button>
+      <div style="display:flex; gap:8px; margin-left:auto;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalLideranca')">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="salvarFormLideranca()">Salvar Liderança</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Histórico de Alterações de Liderança -->
+<div class="modal-overlay" id="modalHistorico">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 id="modalHistoricoTitle">Histórico de Atribuições</h3>
+      <button class="modal-close" onclick="closeModal('modalHistorico')">&times;</button>
+    </div>
+    <div class="modal-body" id="historicoListContainer"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalHistorico')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Seção Eleitoral -->
+<div class="modal-overlay" id="modalSecao">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3 id="modalSecaoTitle">Mapear Seção Eleitoral</h3>
+      <button class="modal-close" onclick="closeModal('modalSecao')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="formSecaoId">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Zona Eleitoral</label>
+          <input type="text" class="form-control" value="008" readonly>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Número da Seção *</label>
+          <input type="text" class="form-control" id="formSecaoNumero" placeholder="Ex: 0012">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Local de Votação Oficial (TSE) *</label>
+          <select class="form-control" id="formSecaoLocal"></select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Comunidade / Território Atendido</label>
+          <select class="form-control" id="formSecaoComunidade"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Eleitores Aptos</label>
+          <input type="number" class="form-control" id="formSecaoAptos" value="350">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Comparecimento</label>
+          <input type="number" class="form-control" id="formSecaoComparecimento" value="300">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Abstenção</label>
+          <input type="number" class="form-control" id="formSecaoAbstencao" value="50">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Situação da Conferência</label>
+          <select class="form-control" id="formSecaoStatus">
+            <option value="Oficial TSE">Oficial TSE</option>
+            <option value="Pendente de Validação">Pendente de Validação</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Observações</label>
+          <textarea class="form-control" id="formSecaoObs" placeholder="Boletim de urna, acessibilidade, etc..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalSecao')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarFormSecao()">Salvar Seção</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Resultado Eleitoral -->
+<div class="modal-overlay" id="modalResultado">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3>Lançamento de Resultado Agregado</h3>
+      <button class="modal-close" onclick="closeModal('modalResultado')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Ano da Eleição</label>
+          <select class="form-control" id="formResAno">
+            <option value="2024">2024</option>
+            <option value="2020">2020</option>
+            <option value="2026">2026</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Turno</label>
+          <select class="form-control" id="formResTurno">
+            <option value="1º Turno">1º Turno</option>
+            <option value="2º Turno">2º Turno</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cargo em Disputa</label>
+          <select class="form-control" id="formResCargo">
+            <option value="Prefeito">Prefeito</option>
+            <option value="Vereador">Vereador</option>
+            <option value="Governador">Governador</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Seção Eleitoral (8ª Zona)</label>
+          <select class="form-control" id="formResSecao"></select>
+        </div>
+
+        <div class="form-group full" style="border-top:1px dashed var(--border-subtle); padding-top:10px;">
+          <label class="form-label" style="color:var(--emerald-400);">Candidato 1 (Situação / Bacurau)</label>
+          <div style="display:flex; gap:10px;">
+            <input type="text" class="form-control" id="formResCand1Nome" value="Candidato Verde (Bacurau)" style="flex:2;">
+            <input type="text" class="form-control" id="formResCand1Num" value="15" style="width:70px;">
+            <input type="number" class="form-control" id="formResCand1Votos" placeholder="Votos" style="flex:1;">
+          </div>
+        </div>
+
+        <div class="form-group full">
+          <label class="form-label" style="color:#38bdf8;">Candidato 2 (Oposição)</label>
+          <div style="display:flex; gap:10px;">
+            <input type="text" class="form-control" id="formResCand2Nome" value="Candidato Azul (Oposição)" style="flex:2;">
+            <input type="text" class="form-control" id="formResCand2Num" value="22" style="width:70px;">
+            <input type="number" class="form-control" id="formResCand2Votos" placeholder="Votos" style="flex:1;">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Votos Brancos</label>
+          <input type="number" class="form-control" id="formResBrancos" value="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Votos Nulos</label>
+          <input type="number" class="form-control" id="formResNulos" value="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Comparecimento Total *</label>
+          <input type="number" class="form-control" id="formResComparecimento" value="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Abstenções</label>
+          <input type="number" class="form-control" id="formResAbstencao" value="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fonte dos Dados</label>
+          <input type="text" class="form-control" id="formResFonte" value="Boletim de Urna Oficial - TSE Dados Abertos">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Situação</label>
+          <select class="form-control" id="formResStatus">
+            <option value="Oficial TSE">Oficial TSE</option>
+            <option value="Provisório">Provisório</option>
+            <option value="Pendente de Validação">Pendente de Validação</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalResultado')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarFormResultado()">Validar & Gravar Resultado</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Dossiê Histórico da Seção TSE (2014 a 2026) -->
+<div class="modal-overlay" id="modalDossieSecao">
+  <div class="modal-container" style="max-width:920px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="dossieSecaoTitulo">📊 Raio-X Histórico TSE (2014 a 2026)</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="dossieSecaoSubtitulo">Carregando dados da seção...</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalDossieSecao')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="tse-dossie-header" id="dossieSecaoInfoBox">
+        <!-- Detalhes do colégio e local -->
+      </div>
+      
+      <div style="font-size:0.9rem; font-weight:700; color:#ffffff; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+        <span>Histórico de Votação por Eleição (2014–2026):</span>
+        <span class="badge-status oficial" id="dossieBadgeTotalEleicoes">7 Eleições</span>
+      </div>
+
+      <div class="table-responsive" style="max-height:450px; overflow-y:auto;">
+        <table class="radar-table">
+          <thead>
+            <tr>
+              <th>Eleição / Ano</th>
+              <th>Cargo</th>
+              <th>Mais Votado na Seção</th>
+              <th>2º Colocado</th>
+              <th>Votos Válidos</th>
+              <th>Comparecimento</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody id="dossieTabelaBody">
+            <!-- Linhas geradas dinamicamente -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalDossieSecao')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Detalhamento de Candidatos na Seção -->
+<div class="modal-overlay" id="modalCandidatosSecao">
+  <div class="modal-container" style="max-width:760px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="candSecaoTitulo">🗳️ Votação dos Candidatos na Seção</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="candSecaoSubtitulo">Estatísticas detalhadas de cada candidato</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalCandidatosSecao')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="candSecaoCardsResumo" style="margin-bottom:16px;"></div>
+      <div class="table-responsive">
+        <table class="radar-table">
+          <thead>
+            <tr>
+              <th style="width:50px;">Pos.</th>
+              <th>Candidato / Partido</th>
+              <th>Votos Nominais</th>
+              <th>% Válidos</th>
+              <th style="min-width:180px;">Distribuição de Votos</th>
+              <th>Situação / Desvio</th>
+            </tr>
+          </thead>
+          <tbody id="candSecaoTabelaBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalCandidatosSecao')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Distribuição Territorial do Candidato por Seção (16 Seções) -->
+<div class="modal-overlay" id="modalCandidatoPorSecoes">
+  <div class="modal-container" style="max-width:980px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="candMapaTitulo">🗺️ Desempenho Territorial do Candidato</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="candMapaSubtitulo">Votação nominal detalhada nas 16 seções de Riachuelo–RN</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalCandidatoPorSecoes')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <!-- Resumo Geral de Votos do Candidato -->
+      <div id="candMapaResumoBox" style="margin-bottom:16px;"></div>
+
+      <!-- Título da Grade de Cards -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <h4 style="font-size:0.95rem; color:#ffffff; margin:0;">
+            🗳️ Votação Nominal nas 16 Seções Eleitorais
+          </h4>
+          <span class="nav-counter" style="background:var(--emerald-600); color:#ffffff; font-size:0.72rem; padding:2px 8px; border-radius:12px;">16 Seções</span>
+        </div>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Riachuelo–RN (8ª Zona)</span>
+      </div>
+
+      <!-- Grade dos 16 Cards das Seções -->
+      <div class="secoes-cards-grid" id="candMapaCardsGrid"></div>
+
+      <!-- Tabela Analítica Opcional para Detalhamento -->
+      <details style="margin-top:16px; background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:10px 14px;">
+        <summary style="cursor:pointer; font-weight:700; color:var(--emerald-400); font-size:0.84rem;">
+          📊 Ver também em formato de Tabela Detalhada
+        </summary>
+        <div class="table-responsive" style="max-height:300px; overflow-y:auto; margin-top:10px;">
+          <table class="radar-table">
+            <thead>
+              <tr>
+                <th style="width:110px;">Seção</th>
+                <th>Local de Votação</th>
+                <th>Bairro / Comunidade</th>
+                <th>Votos Obtidos</th>
+                <th>% Válidos na Seção</th>
+                <th>Desempenho Territorial</th>
+              </tr>
+            </thead>
+            <tbody id="candMapaTabelaBody"></tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalCandidatoPorSecoes')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cadastro Restrito LGPD -->
+<div class="modal-overlay" id="modalLgpd">
+  <div class="modal-container">
+    <div class="modal-header">
+      <h3>Novo Registro Administrativo Restrito (LGPD)</h3>
+      <button class="modal-close" onclick="closeModal('modalLgpd')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Referência / Contato Institucional *</label>
+          <input type="text" class="form-control" id="formLgpdNome" placeholder="Ex: Articulador do Ponto de Convivência">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Comunidade de Atuação</label>
+          <select class="form-control" id="formLgpdComunidade"></select>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Finalidade Legítima do Tratamento *</label>
+          <input type="text" class="form-control" id="formLgpdFinalidade" value="Articulação de demandas de convivência e infraestrutura comunitária">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Base Legal (LGPD)</label>
+          <input type="text" class="form-control" id="formLgpdBase" value="Art. 7º, II e V da LGPD">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prazo de Retenção</label>
+          <input type="text" class="form-control" id="formLgpdRetencao" value="Até 31/12/2028 (Término do ciclo)">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Observações Administrativas</label>
+          <textarea class="form-control" id="formLgpdObs" placeholder="Sem dados eleitorais pessoais. Estritamente institucional."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalLgpd')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarFormLgpd()">Gravar com Auditoria</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cadastro / Edição de Eleitor -->
+<div class="modal-overlay" id="modalEleitor">
+  <div class="modal-container" style="max-width:740px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="modalEleitorTitulo">📝 Cadastrar Novo Eleitor</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="modalEleitorSubtitulo">Vincule o eleitor ao seu bairro, seção e liderança responsável exclusiva</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalEleitor')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="formEleitor" onsubmit="event.preventDefault(); salvarFormEleitor();">
+        <input type="hidden" id="formEleitorId">
+        
+        <div class="form-grid">
+          <!-- Alerta de Conflito de Exclusividade e Duplicidade -->
+          <div class="form-group full" id="eleitorAlertaConflito" style="display:none; background:rgba(239,68,68,0.15); border:1.5px solid #ef4444; border-radius:8px; padding:12px 14px; margin-bottom:4px;">
+            <div style="display:flex; align-items:flex-start; gap:10px;">
+              <span style="font-size:1.35rem; line-height:1;">⛔</span>
+              <div>
+                <strong style="color:#f87171; font-size:0.88rem; display:block; margin-bottom:3px;">Operação Não Permitida — Eleitor Já Cadastrado</strong>
+                <span id="eleitorAlertaConflitoMsg" style="font-size:0.82rem; color:#fca5a5; line-height:1.4;"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nome do Eleitor -->
+          <div class="form-group">
+            <label class="form-label">Nome Completo do Eleitor *</label>
+            <input type="text" class="form-control" id="formEleitorNome" placeholder="Ex: Severino Batista de Lima" required oninput="verificarConflitoEleitorInstantaneo()">
+          </div>
+
+          <!-- Número do Título de Eleitor -->
+          <div class="form-group">
+            <label class="form-label">Número do Título de Eleitor *</label>
+            <input type="text" class="form-control" id="formEleitorNumeroTitulo" placeholder="Ex: 0123 4567 2011" maxlength="14" required oninput="formatarTituloInput(this); verificarConflitoEleitorInstantaneo();">
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">Documento oficial único de 12 dígitos da Justiça Eleitoral</div>
+          </div>
+
+          <!-- Telefone / WhatsApp -->
+          <div class="form-group">
+            <label class="form-label">Telefone / WhatsApp</label>
+            <input type="text" class="form-control" id="formEleitorTelefone" placeholder="Ex: (84) 99876-5432">
+          </div>
+
+          <!-- Seção Eleitoral -->
+          <div class="form-group">
+            <label class="form-label">Seção Eleitoral *</label>
+            <select class="form-control" id="formEleitorSecao" required>
+              <!-- Populado com as 16 seções de Riachuelo -->
+            </select>
+          </div>
+
+          <!-- Bairro / Comunidade -->
+          <div class="form-group">
+            <label class="form-label">Bairro / Comunidade *</label>
+            <select class="form-control" id="formEleitorBairro" onchange="aoSelecionarBairroFormEleitor()" required>
+              <!-- Populado com os bairros de Riachuelo -->
+            </select>
+          </div>
+
+          <!-- Liderança do Bairro / Responsável Exclusiva -->
+          <div class="form-group">
+            <label class="form-label">Liderança Responsável (Exclusiva) *</label>
+            <input type="text" class="form-control" id="formEleitorLideranca" placeholder="Ex: Toinho do Centro" required oninput="verificarConflitoEleitorInstantaneo()" list="listaLiderancasSugestoes">
+            <datalist id="listaLiderancasSugestoes"></datalist>
+            <div id="eleitorLiderancaInfo" style="font-size:0.74rem; color:var(--gold-400); margin-top:3px; display:none;"></div>
+          </div>
+
+          <!-- Rua / Logradouro -->
+          <div class="form-group">
+            <label class="form-label">Rua / Logradouro *</label>
+            <input type="text" class="form-control" id="formEleitorRua" placeholder="Ex: Rua Manoel Severiano" required oninput="aoMudarEnderecoFormEleitor()">
+          </div>
+
+          <!-- Número / Complemento -->
+          <div class="form-group">
+            <label class="form-label">Número / Ponto de Referência</label>
+            <input type="text" class="form-control" id="formEleitorNumero" placeholder="Ex: Nº 142, Próximo à Praça" oninput="aoMudarEnderecoFormEleitor()">
+          </div>
+
+          <!-- Endereço Completo -->
+          <div class="form-group full">
+            <label class="form-label">Endereço Completo (para conferência)</label>
+            <input type="text" class="form-control" id="formEleitorEndereco" placeholder="Rua, Número - Bairro, Riachuelo–RN">
+          </div>
+
+          <!-- Upload / Anexo de Foto do Título de Eleitor -->
+          <div class="form-group full">
+            <label class="form-label">Anexar Foto do Título de Eleitor (Câmera ou Arquivo)</label>
+            <input type="file" id="formEleitorFotoInput" accept="image/*" capture="environment" style="display:none;" onchange="aoSelecionarFotoTitulo(event)">
+            
+            <div id="eleitorUploadArea" class="eleitor-upload-box" onclick="document.getElementById('formEleitorFotoInput').click()">
+              <div class="eleitor-upload-icon">📷</div>
+              <strong style="color:#ffffff; font-size:0.9rem;">Clique para tirar foto ou selecionar a imagem do Título</strong>
+              <p style="font-size:0.75rem; color:var(--text-muted); margin:4px 0 0;">Suporta JPG, PNG, fotos de câmera de celular ou escaneados</p>
+            </div>
+
+            <!-- Preview da Foto Anexada -->
+            <div id="eleitorFotoPreviewContainer" style="display:none; margin-top:10px;">
+              <div class="eleitor-preview-wrap">
+                <img id="eleitorFotoPreviewImg" src="" alt="Título de Eleitor" class="eleitor-preview-img">
+                <button type="button" class="eleitor-remove-foto-btn" onclick="removerFotoTituloAnexada()" title="Remover esta foto">✕</button>
+              </div>
+              <div style="text-align:center; margin-top:6px;">
+                <span class="badge-status oficial" style="font-size:0.72rem;">✓ Documento Fotográfico Anexado</span>
+              </div>
+            </div>
+            <input type="hidden" id="formEleitorFotoBase64">
+          </div>
+
+          <!-- Observações -->
+          <div class="form-group full">
+            <label class="form-label">Observações / Demandas da Família</label>
+            <textarea class="form-control" id="formEleitorObs" placeholder="Ex: Família de 5 votantes, apoia projetos de iluminação e saneamento..."></textarea>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('modalEleitor')">Cancelar</button>
+      <button type="button" class="btn btn-gold" id="btnSalvarEleitor" onclick="salvarFormEleitor()">💾 Gravar Eleitor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Visualizador da Foto do Título de Eleitor (Lightbox) -->
+<div class="modal-overlay" id="modalFotoTitulo">
+  <div class="modal-container" style="max-width:640px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="fotoTituloModalNome">📷 Título de Eleitor</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="fotoTituloModalSub">Comprovante e conferência territorial</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalFotoTitulo')">&times;</button>
+    </div>
+    <div class="modal-body" style="text-align:center;">
+      <div id="fotoTituloModalImgContainer" style="background:#03140c; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--border-emerald); min-height:200px; display:flex; align-items:center; justify-content:center; padding:12px;">
+        <img id="fotoTituloModalImg" src="" alt="Foto do Título" style="max-width:100%; max-height:420px; object-fit:contain; border-radius:6px;">
+      </div>
+      <div id="fotoTituloModalDados" style="margin-top:14px; text-align:left; background:var(--bg-card); padding:12px 16px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
+        <!-- Dados resumidos do eleitor -->
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalFotoTitulo')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cadastro / Edição de Demanda Comunitária -->
+<div class="modal-overlay" id="modalDemanda">
+  <div class="modal-container" style="max-width:720px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="modalDemandaTitulo">📋 Nova Demanda Comunitária</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="modalDemandaSubtitulo">Mapeamento territorial de solicitação popular</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalDemanda')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="formDemanda" onsubmit="event.preventDefault(); salvarFormDemanda();">
+        <input type="hidden" id="formDemandaId">
+        
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label">Título Resumido da Demanda *</label>
+            <input type="text" class="form-control" id="formDemandaTitulo" placeholder="Ex: Patrolamento da estrada vicinal, Luminárias de LED..." required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Categoria da Demanda *</label>
+            <select class="form-control" id="formDemandaCategoria" required>
+              <option value="Infraestrutura & Estradas">Infraestrutura & Estradas</option>
+              <option value="Iluminação Pública">Iluminação Pública</option>
+              <option value="Saneamento & Água">Saneamento & Água</option>
+              <option value="Saúde Pública">Saúde Pública</option>
+              <option value="Esporte & Juventude">Esporte & Juventude</option>
+              <option value="Educação">Educação</option>
+              <option value="Assistência Social">Assistência Social</option>
+              <option value="Outras">Outras</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Grau de Prioridade *</label>
+            <select class="form-control" id="formDemandaPrioridade" required>
+              <option value="Alta">Alta Prioridade (Urgente)</option>
+              <option value="Média" selected>Média Prioridade</option>
+              <option value="Baixa">Baixa Prioridade</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Bairro / Comunidade *</label>
+            <select class="form-control" id="formDemandaBairro" onchange="aoSelecionarBairroFormDemanda()" required>
+              <!-- Populado dinamicamente -->
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Liderança Articuladora</label>
+            <input type="text" class="form-control" id="formDemandaLideranca" placeholder="Liderança responsável local">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Solicitante / Entidade / Associação *</label>
+            <input type="text" class="form-control" id="formDemandaSolicitante" placeholder="Ex: Associação de Moradores, Comissão de Pais..." required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Telefone / WhatsApp</label>
+            <input type="text" class="form-control" id="formDemandaTelefone" placeholder="(84) 99999-9999">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Situação Inicial *</label>
+            <select class="form-control" id="formDemandaStatus" required>
+              <option value="Pendente" selected>Pendente</option>
+              <option value="Em Andamento">Em Andamento</option>
+              <option value="Concluído">Concluído</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Previsão de Atendimento</label>
+            <input type="date" class="form-control" id="formDemandaDataPrevisao">
+          </div>
+
+          <div class="form-group full">
+            <label class="form-label">Detalhamento da Necessidade Comunitária *</label>
+            <textarea class="form-control" id="formDemandaDescricao" rows="3" placeholder="Descreva o problema, localização exata, número de famílias afetadas..." required></textarea>
+          </div>
+
+          <div class="form-group full">
+            <label class="form-label">Encaminhamento / Ofícios / Notas de Solução</label>
+            <textarea class="form-control" id="formDemandaSolucaoNotas" rows="2" placeholder="Ex: Protocolado na Secretaria de Obras sob nº 241/2026..."></textarea>
+          </div>
+
+          <!-- Seção de Anexo de Fotos e Vídeos -->
+          <div class="form-group full">
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>📸 Anexar Mídias Comprobatórias (Fotos e Vídeos)</span>
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Visíveis no Dossiê do Adm Master</span>
+            </label>
+            
+            <div class="demanda-upload-zone" id="demandaUploadZone" onclick="document.getElementById('formDemandaMidiaInput').click()">
+              <input type="file" id="formDemandaMidiaInput" accept="image/*,video/*" multiple style="display:none;" onchange="aoSelecionarMidiasDemanda(event)">
+              <div class="upload-zone-content">
+                <span class="upload-zone-icon">📷 🎥</span>
+                <div class="upload-zone-text">
+                  <strong>Clique aqui ou arraste fotos e vídeos do local/problema</strong>
+                  <p>Suporta imagens (JPG, PNG, WEBP) e vídeos curtos (MP4, WEBM)</p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); document.getElementById('formDemandaMidiaInput').click();">
+                  📂 Selecionar Fotos / Vídeos
+                </button>
+              </div>
+            </div>
+
+            <!-- Grade com miniaturas das mídias anexadas -->
+            <div id="demandaMidiasPreviewContainer" class="demanda-midias-grid" style="display:none;"></div>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('modalDemanda')">Cancelar</button>
+      <button type="button" class="btn btn-gold" onclick="salvarFormDemanda()">💾 Gravar Demanda</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Detalhes e Acompanhamento da Demanda (Raio-X e Dossiê) -->
+<div class="modal-overlay" id="modalDetalhesDemanda">
+  <div class="modal-container" style="max-width:760px;">
+    <div class="modal-header">
+      <div>
+        <h3 id="detalheDemandaTitulo">🔍 Dossiê da Demanda Comunitária</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="detalheDemandaSubtitulo">Histórico, fotos, vídeos e ações de resolução</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalDetalhesDemanda')">&times;</button>
+    </div>
+    <div class="modal-body" id="detalheDemandaBody">
+      <!-- Conteúdo renderizado dinamicamente -->
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalDetalhesDemanda')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Visualizador em Alta Resolução (Fotos / Vídeos) -->
+<div class="modal-overlay" id="modalVisualizadorMidia">
+  <div class="modal-container" style="max-width:860px; background: rgba(8, 14, 24, 0.98); border: 1px solid var(--emerald-500); box-shadow: 0 16px 50px rgba(0,0,0,0.85);">
+    <div class="modal-header">
+      <div>
+        <h3 id="visualizadorMidiaTitulo">📷 Visualização de Mídia</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="visualizadorMidiaSubtitulo">Evidência registrada no dossiê</p>
+      </div>
+      <button class="modal-close" onclick="fecharVisualizadorMidia()">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:320px; text-align:center;" id="visualizadorMidiaConteudo">
+      <!-- Imagem ou Player de Vídeo injetado dinamicamente -->
+    </div>
+    <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+      <a id="visualizadorMidiaDownloadBtn" href="#" download="evidencia-demanda" class="btn btn-secondary btn-sm" target="_blank">
+        ⬇️ Baixar Mídia Original
+      </a>
+      <button class="btn btn-gold btn-sm" onclick="fecharVisualizadorMidia()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Adicionar Novo Partido no Simulador -->
+<div class="modal-overlay" id="modalPartidoSimulador">
+  <div class="modal-container" style="max-width:540px;">
+    <div class="modal-header">
+      <div>
+        <h3>🗳️ Adicionar Legenda no Simulador</h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">Inclusão de partido / federação no cálculo do QE</p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalPartidoSimulador')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="formNovoPartidoSim" onsubmit="event.preventDefault(); salvarNovoPartidoSimulador();">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label">Sigla e Nome do Partido / Federação *</label>
+            <input type="text" class="form-control" id="formPartSigla" placeholder="Ex: PP (Progressistas), SOLIDARIEDADE..." required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cor Representativa</label>
+            <input type="color" class="form-control" id="formPartCor" value="#10b981" style="height:42px; padding:4px;">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Votação Total Projetada *</label>
+            <input type="number" class="form-control" id="formPartVotos" placeholder="Ex: 850" min="0" required>
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Votos do Candidato Mais Votado do Partido *</label>
+            <input type="number" class="form-control" id="formPartCandVotos" placeholder="Ex: 240 (Para cláusula individual de 10% e 20%)" min="0" required>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('modalPartidoSimulador')">Cancelar</button>
+      <button type="button" class="btn btn-gold" onclick="salvarNovoPartidoSimulador()">+ Adicionar na Simulação</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Seletor de Perfil RBAC -->
+<div class="modal-overlay" id="roleModal">
+  <div class="modal-container" style="max-width:520px;">
+    <div class="modal-header">
+      <h3>Alternar Perfil de Acesso (RBAC)</h3>
+      <button class="modal-close" onclick="closeModal('roleModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:14px;">
+        Selecione o perfil desejado para simular e validar os diferentes níveis de permissão da plataforma:
+      </p>
+      <div id="rolesList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('roleModal')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Mapear Liderança e Meta de Votos do Bairro -->
+<div class="modal-overlay" id="modalMapearLiderBairro">
+  <div class="modal-container" style="max-width:680px;">
+    <div class="modal-header">
+      <div>
+        <h3 style="display:flex; align-items:center; gap:8px;">
+          <span>🎯</span> Meta de Votos & Liderança do Bairro
+        </h3>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">
+          Planejamento tático de conversão eleitoral e atribuição de responsabilidade territorial
+        </p>
+      </div>
+      <button class="modal-close" onclick="closeModal('modalMapearLiderBairro')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form id="formMapearLiderBairro" onsubmit="event.preventDefault(); salvarLiderancaEBairroModal();">
+        <input type="hidden" id="formMapBairroId">
+
+        <div class="form-grid">
+          <!-- Seleção do Bairro -->
+          <div class="form-group full">
+            <label class="form-label">Localidade / Bairro / Comunidade *</label>
+            <select class="form-control" id="formMapBairroSelect" onchange="aoSelecionarBairroNoModal(this.value)" required>
+              <!-- Populado via JS -->
+            </select>
+          </div>
+
+          <!-- Liderança Responsável -->
+          <div class="form-group full">
+            <label class="form-label">Nome da Liderança Responsável *</label>
+            <input type="text" class="form-control" id="formMapLiderNome" placeholder="Ex: Maria das Graças / Toinho do Centro" required>
+          </div>
+
+          <!-- Meta de Votos (NOVO REQUISITO) -->
+          <div class="form-group">
+            <label class="form-label" style="color:var(--gold-400); font-weight:700;">
+              🎯 Meta de Votos do Bairro *
+            </label>
+            <input type="number" class="form-control" id="formMapLiderMetaVotos" placeholder="Ex: 350" min="0" required oninput="atualizarPreviewMetaModal()">
+            <span style="font-size:0.7rem; color:var(--text-muted);">Objetivo planejado para este colégio/bairro</span>
+          </div>
+
+          <!-- Votos Conquistados -->
+          <div class="form-group">
+            <label class="form-label" style="color:var(--emerald-400); font-weight:700;">
+              🗳️ Votos Já Conseguidos *
+            </label>
+            <input type="number" class="form-control" id="formMapLiderVotos" placeholder="Ex: 120" min="0" required oninput="atualizarPreviewMetaModal()">
+            <span style="font-size:0.7rem; color:var(--text-muted);">Eleitores confirmados na base</span>
+          </div>
+
+          <!-- Preview em Tempo Real da Barra de Meta -->
+          <div class="form-group full" style="background:var(--bg-card); padding:12px 14px; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <span style="font-size:0.75rem; font-weight:700; color:var(--text-main);">Progresso da Meta deste Bairro:</span>
+              <span id="modalMetaPercentualTexto" style="font-size:0.85rem; font-weight:800; color:var(--emerald-400); font-family:var(--font-mono);">0%</span>
+            </div>
+            <div class="meta-progress-track">
+              <div id="modalMetaProgressBar" class="meta-progress-fill" style="width: 0%;"></div>
+            </div>
+            <div id="modalMetaStatusMsg" style="font-size:0.72rem; color:var(--text-muted); margin-top:5px; text-align:right;">
+              0 de 0 votos alcançados
+            </div>
+          </div>
+
+          <!-- Contato WhatsApp -->
+          <div class="form-group">
+            <label class="form-label">Telefone / WhatsApp da Liderança</label>
+            <input type="text" class="form-control" id="formMapLiderContato" placeholder="(84) 99999-9999">
+          </div>
+
+          <!-- Eleitorado Estimado (informativo) -->
+          <div class="form-group">
+            <label class="form-label">Eleitorado Total Estimado</label>
+            <input type="text" class="form-control" id="formMapEleitoresEstimados" readonly style="opacity:0.85; background:var(--bg-input);">
+          </div>
+
+          <!-- Observações Estratégicas -->
+          <div class="form-group full">
+            <label class="form-label">Orientações de Campanha / Observações de Campo</label>
+            <textarea class="form-control" id="formMapLiderObs" rows="2" placeholder="Notas sobre demandas do bairro, prioridades de visitação, lideranças locais..."></textarea>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn btn-secondary btn-sm" id="btnAbrirFichaCampoPeloModal" onclick="abrirFichaCampoDoBairroAtualModal()">
+          📄 Ver Ficha de Campo
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" style="color:#ef4444; border-color:rgba(239,68,68,0.4);" onclick="removerLiderancaDoBairroModal()" title="Desvincula e remove a liderança deste bairro">
+          ❌ Remover Liderança
+        </button>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalMapearLiderBairro')">Cancelar</button>
+        <button type="button" class="btn btn-gold" onclick="salvarLiderancaEBairroModal()">
+          💾 Salvar Meta & Liderança
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Ficha de Campo Executiva do Bairro (Pronta para Impressão A4 / PDF) -->
+<div class="modal-overlay" id="modalFichaCampoBairro">
+  <div class="modal-container" style="max-width:920px; max-height:92vh; overflow-y:auto;">
+    <div class="modal-header no-print">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:1.5rem;">📄</span>
+        <div>
+          <h3 id="fichaCampoHeaderTitulo" style="margin:0;">Ficha de Campo Territorial</h3>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin:0;">Documento oficial de campo para lideranças e coordenação</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button type="button" class="btn btn-primary" onclick="imprimirFichaCampo()" title="Imprimir em folha A4 ou salvar como PDF limpo">
+          🖨️ Imprimir / Salvar PDF
+        </button>
+        <button class="modal-close" onclick="closeModal('modalFichaCampoBairro')">&times;</button>
+      </div>
+    </div>
+
+    <!-- Área Imprimível da Ficha de Campo -->
+    <div class="modal-body" id="fichaCampoPrintArea" style="padding: 24px;">
+      <!-- Conteúdo injetado dinamicamente pela função gerarFichaCampoBairro() -->
+    </div>
+
+    <div class="modal-footer no-print">
+      <button class="btn btn-secondary" onclick="closeModal('modalFichaCampoBairro')">Fechar</button>
+      <button class="btn btn-primary" onclick="imprimirFichaCampo()">
+        🖨️ Imprimir Ficha de Campo (A4)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Cadastro e Edição de Usuário (Login e Senha) -->
+<div class="modal-overlay" id="modalUsuario">
+  <div class="modal-container" style="max-width:540px;">
+    <div class="modal-header">
+      <h3 id="modalUsuarioTitle">Cadastrar Login e Senha</h3>
+      <button class="modal-close" onclick="closeModal('modalUsuario')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="formUsuarioId">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Nome Completo *</label>
+          <input type="text" class="form-control" id="formUsuarioNome" placeholder="Ex: Dr. Roberto Alencar" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome de Usuário / Login *</label>
+          <input type="text" class="form-control" id="formUsuarioLogin" placeholder="Ex: roberto.alencar" autocomplete="off" required>
+          <small style="color:var(--text-muted); font-size:0.75rem;">Apenas letras, números ou pontos (sem espaços).</small>
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input type="email" class="form-control" id="formUsuarioEmail" placeholder="roberto@radarbacurau.rn.gov.br">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Perfil de Acesso (RBAC) *</label>
+          <select class="form-control" id="formUsuarioPerfil">
+            <option value="ADMINISTRADOR MASTER">ADMINISTRADOR MASTER (Acesso Total)</option>
+            <option value="GESTOR TERRITORIAL">GESTOR TERRITORIAL (Mapeamento & Campo)</option>
+            <option value="ANALISTA">ANALISTA (Dados TSE & Simulador)</option>
+            <option value="CONSULTA">CONSULTA (Somente Visualização)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status do Acesso *</label>
+          <select class="form-control" id="formUsuarioStatus">
+            <option value="Ativo">Ativo (Acesso Liberado)</option>
+            <option value="Bloqueado">Bloqueado (Acesso Suspenso)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha de Acesso *</label>
+          <div class="password-input-wrap">
+            <input type="password" class="form-control" id="formUsuarioSenha" placeholder="Mínimo 4 caracteres" autocomplete="new-password">
+            <button type="button" class="btn-toggle-pwd" onclick="alternarVisibilidadeSenha('formUsuarioSenha', this)" title="Ver senha">👁️</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar Senha *</label>
+          <div class="password-input-wrap">
+            <input type="password" class="form-control" id="formUsuarioSenhaConfirma" placeholder="Repita a senha">
+            <button type="button" class="btn-toggle-pwd" onclick="alternarVisibilidadeSenha('formUsuarioSenhaConfirma', this)" title="Ver senha">👁️</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('modalUsuario')">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="salvarFormUsuario()">Salvar Credenciais</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Seleção Rápida de Perfil (RBAC) -->
+<div class="modal-overlay" id="roleModal">
+  <div class="modal-container" style="max-width:440px;">
+    <div class="modal-header">
+      <h3>Perfis e Contas de Usuário</h3>
+      <button class="modal-close" onclick="closeModal('roleModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:14px;">
+        Alterne rapidamente entre os usuários cadastrados ou acesse o cadastro completo:
+      </p>
+      <div id="rolesList"></div>
+    </div>
+    <div class="modal-footer" style="display:flex; justify-content:space-between;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="abrirModalNovoUsuario(); closeModal('roleModal');">
+        + Cadastrar Novo
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="abrirTelaLogin(); closeModal('roleModal');">
+        🚪 Tela de Login / Sair
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Tela de Autenticação / Login e Cadastro de Senha -->
+<div class="auth-screen-overlay" id="authScreenOverlay" style="display:none;">
+  <div class="auth-card">
+    <button type="button" class="modal-close" onclick="fecharTelaLogin()" style="position:absolute; top:12px; right:16px; font-size:1.3rem; z-index:10;" title="Fechar">&times;</button>
+    <div class="auth-header">
+      <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="auth-logo">
+      <div class="auth-title">Acesso Seguro ao Radar Bacurau</div>
+      <div class="auth-subtitle">Plataforma de Inteligência Territorial e Estratégia Eleitoral</div>
+    </div>
+
+    <div class="auth-body">
+      <!-- Formulário de Login Exclusivo -->
+      <form onsubmit="executarLogin(event)">
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label">Usuário (Login) ou E-mail *</label>
+          <input type="text" class="form-control" id="authLoginUsuario" placeholder="Digite seu login ou e-mail" required autofocus>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label class="form-label" style="margin-bottom:0;">Senha *</label>
+            <a href="javascript:void(0)" onclick="mostrarAjudaSenha()" style="font-size:0.75rem; color:var(--gold-400); text-decoration:none;">Esqueceu a senha?</a>
+          </div>
+          <div class="password-input-wrap">
+            <input type="password" class="form-control" id="authLoginSenha" placeholder="Digite sua senha" required>
+            <button type="button" class="btn-toggle-pwd" onclick="alternarVisibilidadeSenha('authLoginSenha', this)" title="Ver senha">👁️</button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary auth-btn-submit">
+          Entrar no Sistema
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Container de Notificações Toast -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Scripts Próprios -->
+<script src="js/tse-data.js"></script>
+<script src="js/seed-data.js"></script>
+<script src="js/database.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/whatsapp-dispatcher.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
