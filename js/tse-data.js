@@ -14,7 +14,6 @@ const TSE_CONFIG = {
   anos: [2026, 2024, 2022, 2020, 2018, 2016, 2014],
   eleicoesPorAno: {
     2026: [
-      { cargo: "Governo do Estado", tipo: "Projeção Bacurau 2026", turno: "1º Turno" },
       { cargo: "Deputado Estadual", tipo: "Projeção Bacurau 2026", turno: "Único" },
       { cargo: "Deputado Federal", tipo: "Projeção Bacurau 2026", turno: "Único" }
     ],
@@ -139,7 +138,7 @@ const TSE_HISTORICO_SECOES = (function() {
       const vantagemPct = Number((vencedor.percentualValidos - segundo.percentualValidos).toFixed(2));
 
       resultados.push({
-        id: `tse-${ano}-${cargo.toLowerCase().replace(/\s+/g, '-')}-sec-${sb.secao}`,
+        id: `tse-${ano}-${cargo.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${(turno || 'unico').toLowerCase().replace(/[^a-z0-9]/g, '-')}-sec-${sb.secao}`,
         ano: ano,
         cargo: cargo,
         eleicao: eleicao,
@@ -568,50 +567,45 @@ const TSE_HISTORICO_SECOES = (function() {
   });
 
   // =========================================================================
-  // 7. ELEIÇÕES 2026 (PROJEÇÃO ESTRATÉGICA RADAR BACURAU)
+  // 7. ELEIÇÕES 2026 (PROJEÇÃO ESTRATÉGICA RADAR BACURAU — NOMES REAIS DO RN)
   // =========================================================================
-  registrarEleicao({
-    ano: 2026,
-    cargo: "Governo do Estado",
-    eleicao: "Projeção Estratégica 2026 (Radar Bacurau)",
-    turno: "1º Turno",
-    candidatosDef: [
-      { nome: "Candidato Aliança Governista / Bacurau", numero: "55", partido: "COLIGAÇÃO POTIGUAR", percentualBase: 0.568, perfilRegional: "joca", situacao: "Meta Projetada (Líder)" },
-      { nome: "Candidato Bloco Oposicionista", numero: "22", partido: "OPOSIÇÃO RN", percentualBase: 0.432, perfilRegional: "oposicao_municipal", situacao: "Meta Projetada (2º)" }
-    ],
-    fatorComparecimento: 0.89,
-    percentualBrancos: 0.012,
-    percentualNulos: 0.024
-  });
 
+  // Deputado Estadual — Nomes Reais do RN
   registrarEleicao({
     ano: 2026,
     cargo: "Deputado Estadual",
     eleicao: "Projeção Estratégica 2026 (Radar Bacurau)",
     turno: "Único",
     candidatosDef: [
-      { nome: "Candidato Prioritário Municipal (Base Joca)", numero: "55000", partido: "PSD", percentualBase: 0.485, perfilRegional: "joca", situacao: "Projeção Majoritária" },
-      { nome: "Candidato Regional Aliado Potengi", numero: "55123", partido: "PSD", percentualBase: 0.228, perfilRegional: "joca", situacao: "Projeção 2º Lugar" },
-      { nome: "Candidato Apoio Oposição Riachuelo", numero: "15000", partido: "MDB", percentualBase: 0.185, perfilRegional: "mara", situacao: "Projeção Oposição" },
-      { nome: "Candidato da Federação de Esquerda", numero: "13000", partido: "PT", percentualBase: 0.072, perfilRegional: "pt", situacao: "Projeção Base" },
-      { nome: "Votos Dispersos / Outros", numero: "OUTROS", partido: "DIV", percentualBase: 0.030, perfilRegional: "neutro", situacao: "Resíduo" }
+      { nome: "Tomba Farias", numero: "45111", partido: "PSDB", percentualBase: 0.365, perfilRegional: "joca", situacao: "1º Mais Votado em Riachuelo (Eleito)" },
+      { nome: "Hermano Morais", numero: "15333", partido: "MDB", percentualBase: 0.224, perfilRegional: "mara", situacao: "2º Lugar em Riachuelo (Eleito)" },
+      { nome: "Ezequiel Ferreira", numero: "45555", partido: "PSDB", percentualBase: 0.142, perfilRegional: "joca", situacao: "Eleito Deputado Estadual" },
+      { nome: "Divaneide Basílio", numero: "13013", partido: "PT", percentualBase: 0.088, perfilRegional: "pt", situacao: "Eleita Deputada Estadual" },
+      { nome: "Dr. Bernardo", numero: "45000", partido: "PSDB", percentualBase: 0.065, perfilRegional: "joca", situacao: "Eleito Deputado Estadual" },
+      { nome: "Kleber Rodrigues", numero: "45678", partido: "PSDB", percentualBase: 0.045, perfilRegional: "joca", situacao: "Eleito Deputado Estadual" },
+      { nome: "Isolda Dantas", numero: "13111", partido: "PT", percentualBase: 0.035, perfilRegional: "pt", situacao: "Eleita Deputada Estadual" },
+      { nome: "Gustavo Carvalho", numero: "45222", partido: "PSDB", percentualBase: 0.022, perfilRegional: "joca", situacao: "Eleito Deputado Estadual" },
+      { nome: "Cristiane Dantas", numero: "77123", partido: "SOLIDARIEDADE", percentualBase: 0.014, perfilRegional: "oposicao_municipal", situacao: "Suplente" }
     ],
     fatorComparecimento: 0.89,
     percentualBrancos: 0.025,
     percentualNulos: 0.035
   });
 
+  // Deputado Federal — Nomes Reais do RN
   registrarEleicao({
     ano: 2026,
     cargo: "Deputado Federal",
     eleicao: "Projeção Estratégica 2026 (Radar Bacurau)",
     turno: "Único",
     candidatosDef: [
-      { nome: "Candidato Federal Base Municipal", numero: "5555", partido: "PSD", percentualBase: 0.525, perfilRegional: "joca", situacao: "Projeção Majoritária" },
-      { nome: "Candidato Federal Aliado Potengi", numero: "4444", partido: "UNIÃO", percentualBase: 0.245, perfilRegional: "joca", situacao: "Projeção 2º Lugar" },
-      { nome: "Candidato Federal Oposição Regional", numero: "1515", partido: "MDB", percentualBase: 0.162, perfilRegional: "mara", situacao: "Projeção Oposição" },
-      { nome: "Candidato Federal Base Popular", numero: "1313", partido: "PT", percentualBase: 0.050, perfilRegional: "pt", situacao: "Projeção Popular" },
-      { nome: "Votos Dispersos / Outros", numero: "OUTROS", partido: "DIV", percentualBase: 0.018, perfilRegional: "neutro", situacao: "Resíduo" }
+      { nome: "Benes Leocádio", numero: "4444", partido: "UNIÃO", percentualBase: 0.385, perfilRegional: "joca", situacao: "1º Mais Votado em Riachuelo (Eleito)" },
+      { nome: "Walter Alves", numero: "1515", partido: "MDB", percentualBase: 0.245, perfilRegional: "mara", situacao: "Eleito Deputado Federal" },
+      { nome: "João Maia", numero: "1111", partido: "PP", percentualBase: 0.138, perfilRegional: "joca", situacao: "Eleito Deputado Federal" },
+      { nome: "Robinson Faria", numero: "2222", partido: "PL", percentualBase: 0.092, perfilRegional: "joca", situacao: "Eleito Deputado Federal" },
+      { nome: "Fernando Mineiro", numero: "1313", partido: "PT", percentualBase: 0.075, perfilRegional: "pt", situacao: "Eleito Deputado Federal" },
+      { nome: "Natália Bonavides", numero: "1300", partido: "PT", percentualBase: 0.040, perfilRegional: "pt", situacao: "Eleita Deputada Federal" },
+      { nome: "General Girão", numero: "2210", partido: "PL", percentualBase: 0.025, perfilRegional: "oposicao_municipal", situacao: "Eleito Deputado Federal" }
     ],
     fatorComparecimento: 0.89,
     percentualBrancos: 0.028,
@@ -633,7 +627,7 @@ const TSE_SERVICE = {
 
   getCargosPorAno(ano) {
     const list = TSE_CONFIG.eleicoesPorAno[Number(ano)] || [];
-    return list.map(item => item.cargo);
+    return Array.from(new Set(list.map(item => item.cargo)));
   },
 
   filtrar({ ano = null, cargo = null, secao = null }) {
@@ -679,14 +673,18 @@ const TSE_SERVICE = {
    * Retorna o Ranking Territorial Oficial de Candidatos (Vereador, Governador, Deputados, etc.)
    * com paginação estrita de no máximo 10 por página.
    */
-  getRankingCandidatosPaginado({ ano = null, cargo = null, busca = "", pagina = 1, limite = 10 }) {
+  getRankingCandidatosPaginado({ ano = null, cargo = null, turno = null, busca = "", pagina = 1, limite = 10 }) {
     // 1. Filtra registros de seções elegíveis
     let registros = TSE_HISTORICO_SECOES;
     if (ano) {
       registros = registros.filter(r => Number(r.ano) === Number(ano));
     }
     if (cargo && cargo.trim() !== "") {
-      registros = registros.filter(r => r.cargo.toLowerCase() === cargo.toLowerCase());
+      const cLow = cargo.toLowerCase().trim();
+      registros = registros.filter(r => r.cargo.toLowerCase() === cLow || r.cargo.toLowerCase().includes(cLow));
+    }
+    if (turno && turno.trim() !== "" && turno !== "todos") {
+      registros = registros.filter(r => r.turno && r.turno.toLowerCase() === turno.toLowerCase());
     }
 
     // 2. Agrega os votos individuais de cada candidato no município
@@ -696,7 +694,7 @@ const TSE_SERVICE = {
     registros.forEach(r => {
       totalVotosValidosMunicipio += r.votosValidos || 0;
       (r.candidatos || []).forEach(c => {
-        const chave = `${c.nome}__${c.cargo}__${c.ano}`;
+        const chave = `${c.nome}__${c.cargo}__${c.ano}__${r.turno || 'unico'}`;
         if (!mapaCandidatos[chave]) {
           mapaCandidatos[chave] = {
             id: chave,
@@ -705,6 +703,7 @@ const TSE_SERVICE = {
             partido: c.partido,
             cargo: c.cargo,
             ano: c.ano,
+            turno: r.turno || '1º Turno',
             situacao: c.situacao,
             totalVotos: 0,
             votosPorSecao: [],
@@ -737,10 +736,14 @@ const TSE_SERVICE = {
     // 3. Converte em array e calcula percentuais
     let lista = Object.values(mapaCandidatos);
 
-    // Calcula percentual dos válidos daquele cargo
+    // Calcula percentual dos válidos daquele cargo e turno
     lista.forEach(cand => {
-      // Total de válidos para aquele cargo específico e ano
-      const registrosDoCargo = registros.filter(r => r.cargo === cand.cargo && Number(r.ano) === Number(cand.ano));
+      // Total de válidos para aquele cargo específico, ano e turno
+      const registrosDoCargo = registros.filter(r => 
+        r.cargo === cand.cargo && 
+        Number(r.ano) === Number(cand.ano) && 
+        (!cand.turno || r.turno === cand.turno)
+      );
       const validosCargo = registrosDoCargo.reduce((acc, curr) => acc + (curr.votosValidos || 0), 0);
       cand.percentualValidos = validosCargo > 0 ? Number(((cand.totalVotos / validosCargo) * 100).toFixed(2)) : 0;
     });
@@ -760,7 +763,8 @@ const TSE_SERVICE = {
         c.nome.toLowerCase().includes(q) ||
         c.partido.toLowerCase().includes(q) ||
         String(c.numero).includes(q) ||
-        c.cargo.toLowerCase().includes(q)
+        c.cargo.toLowerCase().includes(q) ||
+        (c.turno && c.turno.toLowerCase().includes(q))
       );
     }
 

@@ -28,6 +28,7 @@ const AppState = {
   ranking: {
     ano: 2024,
     cargo: "Vereador",
+    turno: "",
     busca: "",
     pagina: 1,
     limite: 10
@@ -2853,7 +2854,7 @@ function aoSelecionarFotoTitulo(event) {
     if (previewImg) previewImg.src = base64;
     if (previewContainer) previewContainer.style.display = "block";
     if (uploadArea) uploadArea.style.display = "none";
-    showToast("Foto do título anexada com sucesso!");
+    showToast("Imagem anexada com sucesso!");
   };
   reader.readAsDataURL(file);
 }
@@ -4698,13 +4699,35 @@ function renderEstatisticas() {
 function aoMudarFiltroRanking(novaPagina = 1) {
   const cargoEl = document.getElementById("filtroRankingCargo");
   const anoEl = document.getElementById("filtroRankingAno");
+  const turnoEl = document.getElementById("filtroRankingTurno");
   const searchEl = document.getElementById("searchRankingInput");
 
-  if (cargoEl) AppState.ranking.cargo = cargoEl.value;
+  if (cargoEl) {
+    AppState.ranking.cargo = cargoEl.value;
+    if (cargoEl.value.includes("1º Turno")) {
+      AppState.ranking.turno = "1º Turno";
+      if (turnoEl) turnoEl.value = "1º Turno";
+    } else if (cargoEl.value.includes("2º Turno")) {
+      AppState.ranking.turno = "2º Turno";
+      if (turnoEl) turnoEl.value = "2º Turno";
+    }
+  }
   if (anoEl) AppState.ranking.ano = Number(anoEl.value);
+  if (turnoEl && (!cargoEl || (!cargoEl.value.includes("1º") && !cargoEl.value.includes("2º")))) {
+    AppState.ranking.turno = turnoEl.value;
+  }
   if (searchEl) AppState.ranking.busca = searchEl.value;
   AppState.ranking.pagina = Number(novaPagina) || 1;
 
+  renderRankingTerritorial();
+}
+
+function selecionarTurnoRanking(turno) {
+  AppState.ranking.turno = turno;
+  const turnoEl = document.getElementById("filtroRankingTurno");
+  if (turnoEl) turnoEl.value = turno;
+
+  AppState.ranking.pagina = 1;
   renderRankingTerritorial();
 }
 
@@ -4729,6 +4752,13 @@ function aoMudarAnoRanking() {
     }
   }
 
+  // Se ano for 2026, reseta turno para vazio (cargos de deputado são turno único)
+  if (AppState.ranking.ano === 2026) {
+    AppState.ranking.turno = "";
+    const turnoEl = document.getElementById("filtroRankingTurno");
+    if (turnoEl) turnoEl.value = "";
+  }
+
   AppState.ranking.pagina = 1;
   renderRankingTerritorial();
 }
@@ -4749,6 +4779,7 @@ function renderRankingTerritorial() {
   const resultadoPaginado = db.getRankingTerritorialCandidatos({
     ano: AppState.ranking.ano,
     cargo: AppState.ranking.cargo,
+    turno: AppState.ranking.turno,
     busca: AppState.ranking.busca,
     pagina: AppState.ranking.pagina,
     limite: AppState.ranking.limite
@@ -4756,18 +4787,44 @@ function renderRankingTerritorial() {
 
   const { itens, totalItens, totalPaginas, paginaAtual, inicioIndice, fimIndice } = resultadoPaginado;
 
+  // Atualiza barra dinâmica de turnos
+  const turnosContainer = document.getElementById("rankingTurnosContainer");
+  const btn1 = document.getElementById("btnRankingTurno1");
+  const btn2 = document.getElementById("btnRankingTurno2");
+  const turnoAviso = document.getElementById("rankingTurnoAviso");
+
+  // O container de 2 turnos só é exibido para eleições majoritárias de anos em que houve 2º turno (2018 e 2022)
+  const temTurnos = (AppState.ranking.ano === 2022 || AppState.ranking.ano === 2018) && 
+                    (!AppState.ranking.cargo || AppState.ranking.cargo.includes("Presidente") || AppState.ranking.cargo.includes("Governador"));
+
+  if (turnosContainer) {
+    turnosContainer.style.display = temTurnos ? "flex" : "none";
+  }
+
+  const isSegundo = (AppState.ranking.turno === "2º Turno") || (AppState.ranking.cargo && AppState.ranking.cargo.includes("2º Turno"));
+  if (btn1) {
+    btn1.className = !isSegundo ? "btn btn-sm btn-gold" : "btn btn-sm btn-secondary";
+  }
+  if (btn2) {
+    btn2.className = isSegundo ? "btn btn-sm btn-gold" : "btn btn-sm btn-secondary";
+  }
+  if (turnoAviso) {
+    turnoAviso.innerHTML = "";
+  }
+
   // Atualiza Título e Subtítulo
   const tituloEl = document.getElementById("rankingTerritorialTitulo");
   const subtituloEl = document.getElementById("rankingTerritorialSubtitulo");
   const cargoTexto = AppState.ranking.cargo ? `Cargo: ${AppState.ranking.cargo}` : "Todos os Cargos";
-  if (tituloEl) tituloEl.textContent = `🏆 Ranking Territorial Oficial — ${cargoTexto} (${AppState.ranking.ano})`;
+  const turnoTexto = AppState.ranking.turno ? ` • ${AppState.ranking.turno}` : "";
+  if (tituloEl) tituloEl.textContent = `🏆 Ranking Territorial Oficial — ${cargoTexto}${turnoTexto} (${AppState.ranking.ano})`;
   if (subtituloEl) subtituloEl.textContent = `Votação nominal detalhada de cada candidato no município de Riachuelo–RN • Total de ${totalItens} candidatos catalogados`;
 
   if (itens.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="9" style="text-align:center; padding:35px; color:var(--text-muted);">
-          Nenhum candidato encontrado com os filtros selecionados. Tente alterar o cargo, o ano ou limpar a busca.
+          Nenhum candidato encontrado com os filtros selecionados. Tente alterar o cargo, o ano, o turno ou limpar a busca.
         </td>
       </tr>
     `;
@@ -4781,6 +4838,9 @@ function renderRankingTerritorial() {
     const cargoSlug = c.cargo.toLowerCase().replace(/\s+/g, '-');
     const polo = c.secaoMaisForte ? `Seção ${c.secaoMaisForte.secao} (${c.secaoMaisForte.votos} votos)` : 'Média municipal';
     const localPolo = c.secaoMaisForte ? c.secaoMaisForte.bairro : 'Riachuelo';
+    const turnoBadge = c.turno === '2º Turno' 
+      ? '<span class="badge-status pendente" style="font-size:0.68rem; padding:1px 6px;">2º Turno</span>'
+      : (c.turno === '1º Turno' ? '<span class="badge-status oficial" style="font-size:0.68rem; padding:1px 6px;">1º Turno</span>' : '<span class="badge-status oficial" style="font-size:0.68rem; padding:1px 6px;">Único</span>');
 
     return `
       <tr class="clickable-row" onclick="abrirMapaSecoesCandidato('${encodeURIComponent(c.id)}')" title="Clique no candidato para abrir o card com todos os votos nas 16 seções">
@@ -4804,7 +4864,8 @@ function renderRankingTerritorial() {
           <span class="cargo-tag ${cargoSlug}">${c.cargo}</span>
         </td>
         <td>
-          <span style="font-family:var(--font-mono); font-size:0.85rem; color:var(--text-muted);">${c.ano}</span>
+          <span style="font-family:var(--font-mono); font-size:0.85rem; color:var(--text-muted);">${c.ano}</span><br>
+          ${turnoBadge}
         </td>
         <td>
           <strong style="font-family:var(--font-mono); font-size:1.05rem; color:var(--gold-400);">
@@ -4910,7 +4971,7 @@ function abrirMapaSecoesCandidato(chaveCandidatoDecoded) {
   const tbody = document.getElementById("candMapaTabelaBody");
 
   if (tituloEl) tituloEl.innerHTML = `🗺️ Votação Territorial — <span style="color:var(--gold-400);">${cand.nome}</span> (${cand.partido})`;
-  if (subtituloEl) subtituloEl.textContent = `${cand.cargo} • Eleições ${cand.ano} • Riachuelo–RN (8ª Zona)`;
+  if (subtituloEl) subtituloEl.textContent = `${cand.cargo} • ${cand.turno ? cand.turno + ' • ' : ''}Eleições ${cand.ano} • Riachuelo–RN (8ª Zona)`;
 
   if (resumoBox) {
     resumoBox.innerHTML = `
@@ -5799,6 +5860,34 @@ function resetarDadosFabrica() {
   }
 }
 
+function resetarTudoEleitoresDemandasLiderancas() {
+  const confirmacao = confirm(
+    "⚠️ ATENÇÃO: Deseja realmente RESETAR TUDO (Eleitores, Demandas e Lideranças)?\n\n" +
+    "Esta operação irá apagar permanentemente:\n" +
+    "• Todos os eleitores cadastrados\n" +
+    "• Todas as demandas comunitárias registradas\n" +
+    "• Todas as lideranças cadastradas e seus vínculos\n\n" +
+    "Os dados das seções, estatísticas do TSE e logins administrativos serão mantidos.\n\n" +
+    "Deseja continuar?"
+  );
+
+  if (!confirmacao) return;
+
+  const sucesso = db.resetarTudoOperacional();
+  if (sucesso) {
+    if (typeof atualizarContadoresMenu === "function") atualizarContadoresMenu();
+    if (typeof renderEleitores === "function" && AppState.currentView === "eleitores") renderEleitores();
+    if (typeof renderDemandas === "function" && AppState.currentView === "demandas") renderDemandas();
+    if (typeof renderLiderancas === "function" && AppState.currentView === "liderancas") renderLiderancas();
+    if (typeof renderConfiguracoes === "function") renderConfiguracoes();
+
+    showToast("Base resetada com sucesso! Eleitores, demandas e lideranças foram limpos.");
+    renderView(AppState.currentView);
+  } else {
+    alert("Falha ao resetar a base de dados.");
+  }
+}
+
 // ==========================================================================
 // 8.1 GESTÃO E CONFORMIDADE LGPD
 // ==========================================================================
@@ -6066,6 +6155,7 @@ window.abrirMapaSecoesCandidato = abrirMapaSecoesCandidato;
 window.mudarPaginaRanking = mudarPaginaRanking;
 window.aoMudarFiltroRanking = aoMudarFiltroRanking;
 window.aoMudarAnoRanking = aoMudarAnoRanking;
+window.selecionarTurnoRanking = selecionarTurnoRanking;
 
 // Eleitores
 window.renderEleitores = renderEleitores;
@@ -6127,6 +6217,7 @@ window.dispararUploadBackup = dispararUploadBackup;
 window.carregarArquivoBackup = carregarArquivoBackup;
 window.resetarBaseDadosPadrao = resetarBaseDadosPadrao;
 window.resetarDadosFabrica = resetarDadosFabrica;
+window.resetarTudoEleitoresDemandasLiderancas = resetarTudoEleitoresDemandasLiderancas;
 window.exportarBackupJSON = exportarBackupJSON;
 window.exportarExcelRelatorioGeral = exportarExcelRelatorioGeral;
 window.imprimirRelatorioExecutivo = imprimirRelatorioExecutivo;

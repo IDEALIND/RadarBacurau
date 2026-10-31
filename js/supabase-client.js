@@ -453,6 +453,19 @@ const SupabaseClient = {
     } catch (e) {
       console.error("Erro ao excluir usuário no Supabase:", e);
     }
+  },
+
+  async resetarNuvemOperacional() {
+    if (!this.isConnected()) return;
+    try {
+      await Promise.allSettled([
+        this.client.from("eleitores").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+        this.client.from("demandas").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+        this.client.from("liderancas").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+      ]);
+    } catch (e) {
+      console.warn("Aviso ao resetar tabelas operacionais no Supabase:", e);
+    }
   }
 };
 

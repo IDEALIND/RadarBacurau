@@ -47,6 +47,11 @@ class RadarBacurauDB {
           this.data.simuladorConfig = JSON.parse(JSON.stringify(SEED_DATA.simuladorConfig || {}));
           this.save();
         }
+        if (typeof TSE_HISTORICO_SECOES !== "undefined") {
+          this.data.resultadosEleitorais = TSE_HISTORICO_SECOES;
+        } else if (this.data.resultadosEleitorais && Array.isArray(this.data.resultadosEleitorais)) {
+          this.data.resultadosEleitorais = this.data.resultadosEleitorais.filter(r => !(Number(r.ano) === 2026 && r.cargo && r.cargo.toLowerCase().includes("governo")));
+        }
         if (this.data.comunidades && Array.isArray(this.data.comunidades)) {
           let mudou = false;
           this.data.comunidades.forEach(c => {
@@ -915,7 +920,14 @@ class RadarBacurauDB {
       list = list.filter(r => Number(r.ano) === Number(filtros.ano));
     }
     if (filtros.cargo) {
-      list = list.filter(r => r.cargo.toLowerCase() === filtros.cargo.toLowerCase());
+      const cFilter = filtros.cargo.toLowerCase().trim();
+      list = list.filter(r => {
+        const rCargo = r.cargo.toLowerCase().trim();
+        return rCargo === cFilter || rCargo.includes(cFilter) || cFilter.includes(rCargo);
+      });
+    }
+    if (filtros.turno && filtros.turno.trim() !== "" && filtros.turno !== "todos") {
+      list = list.filter(r => r.turno && r.turno.toLowerCase() === filtros.turno.toLowerCase());
     }
     if (filtros.secao) {
       list = list.filter(r => r.secao === filtros.secao);
@@ -1641,6 +1653,44 @@ class RadarBacurauDB {
     } catch (e) {
       throw new Error("Erro na importação: " + e.message);
     }
+  }
+
+  resetarTudoOperacional() {
+    if (!this.data) return false;
+
+    // 1. Limpa todos os eleitores
+    this.data.eleitores = [];
+
+    // 2. Limpa todas as demandas comunitárias
+    this.data.demandas = [];
+
+    // 3. Limpa todas as lideranças
+    this.data.liderancas = [];
+
+    // 4. Desvincula lideranças dos Bairros e Comunidades
+    if (this.data.comunidades && Array.isArray(this.data.comunidades)) {
+      this.data.comunidades.forEach(com => {
+        com.liderancaNome = "";
+        com.liderancaResponsavelId = null;
+        com.liderancaContato = "";
+        com.votosConseguidos = 0;
+      });
+    }
+
+    // 5. Remove usuários com perfil de Liderança Comunitária (mantém ADMINISTRADOR MASTER e usuários institucionais)
+    if (this.data.usuarios && Array.isArray(this.data.usuarios)) {
+      this.data.usuarios = this.data.usuarios.filter(u => u.perfil !== "LIDERANÇA COMUNITÁRIA");
+    }
+
+    // 6. Salva localmente
+    this.save();
+
+    // 7. Sincroniza exclusão em nuvem se Supabase estiver ativo
+    if (typeof SupabaseClient !== "undefined" && SupabaseClient.resetarNuvemOperacional) {
+      SupabaseClient.resetarNuvemOperacional();
+    }
+
+    return true;
   }
 }
 

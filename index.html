@@ -1335,11 +1335,31 @@
                 <option value="2014">Eleições 2014</option>
                 <option value="2026">Projeção 2026 (Bacurau)</option>
               </select>
+              <select class="form-select" id="filtroRankingTurno" onchange="aoMudarFiltroRanking(1)">
+                <option value="">Todos os Turnos</option>
+                <option value="2º Turno">2º Turno</option>
+                <option value="1º Turno">1º Turno</option>
+                <option value="Único">Turno Único</option>
+              </select>
               <div class="search-input-wrap">
                 <i>🔍</i>
                 <input type="text" class="form-input" id="searchRankingInput" placeholder="Buscar candidato ou partido..." oninput="aoMudarFiltroRanking(1)">
               </div>
             </div>
+          </div>
+
+          <!-- Barra Dinâmica de Seleção de Turnos (1º e 2º Turnos) -->
+          <div id="rankingTurnosContainer" style="display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; background:linear-gradient(135deg, rgba(6,78,59,0.25) 0%, rgba(3,20,12,0.5) 100%); border:1px solid var(--border-emerald); padding:10px 14px; border-radius:var(--radius-md);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:0.85rem; color:#ffffff; font-weight:700;">Turno da Disputa:</span>
+              <button type="button" class="btn btn-sm btn-gold" id="btnRankingTurno1" onclick="selecionarTurnoRanking('1º Turno')">
+                🗳️ 1º Turno (Definição dos Finalistas)
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary" id="btnRankingTurno2" onclick="selecionarTurnoRanking('2º Turno')">
+                🏆 2º Turno (Decisão Final)
+              </button>
+            </div>
+            <div id="rankingTurnoAviso" style="font-size:0.8rem; color:var(--gold-400); font-weight:600;"></div>
           </div>
 
           <!-- Barra de Navegação Horizontal com Botões para Rolar Lateralmente -->
@@ -1365,7 +1385,7 @@
                   <th style="width:70px;">Posição</th>
                   <th>Candidato / Partido</th>
                   <th>Cargo em Disputa</th>
-                  <th>Ano / Eleição</th>
+                  <th>Ano / Turno</th>
                   <th>Total de Votos (Riachuelo)</th>
                   <th>% Válidos</th>
                   <th>Pólo de Maior Votação (Seção Mais Forte)</th>
@@ -1648,6 +1668,9 @@
               <input type="file" id="backupFileInput" accept=".json" style="display:none;" onchange="carregarArquivoBackup(event)">
               <button class="btn btn-secondary" style="color:var(--status-pendente); border-color:var(--status-pendente);" onclick="resetarBaseDadosPadrao()">
                 ⚠️ Restaurar Dados Oficiais Padrão de Riachuelo
+              </button>
+              <button class="btn btn-secondary" style="color:#ef4444; border-color:#ef4444; background:rgba(239,68,68,0.12); font-weight:700;" onclick="resetarTudoEleitoresDemandasLiderancas()" title="Exclui todos os eleitores cadastrados, todas as demandas e todas as lideranças">
+                🗑️ Resetar Tudo (Eleitores, Demandas e Lideranças)
               </button>
             </div>
           </div>
@@ -2327,25 +2350,25 @@
             <input type="text" class="form-control" id="formEleitorEndereco" placeholder="Rua, Número - Bairro, Riachuelo–RN">
           </div>
 
-          <!-- Upload / Anexo de Foto do Título de Eleitor -->
+          <!-- Upload / Anexo de Imagem -->
           <div class="form-group full">
-            <label class="form-label">Anexar Foto do Título de Eleitor (Câmera ou Arquivo)</label>
+            <label class="form-label">Anexar Imagem (Câmera ou Arquivo)</label>
             <input type="file" id="formEleitorFotoInput" accept="image/*" capture="environment" style="display:none;" onchange="aoSelecionarFotoTitulo(event)">
             
             <div id="eleitorUploadArea" class="eleitor-upload-box" onclick="document.getElementById('formEleitorFotoInput').click()">
               <div class="eleitor-upload-icon">📷</div>
-              <strong style="color:#ffffff; font-size:0.9rem;">Clique para tirar foto ou selecionar a imagem do Título</strong>
+              <strong style="color:#ffffff; font-size:0.9rem;">Clique para selecionar ou anexar imagem</strong>
               <p style="font-size:0.75rem; color:var(--text-muted); margin:4px 0 0;">Suporta JPG, PNG, fotos de câmera de celular ou escaneados</p>
             </div>
 
-            <!-- Preview da Foto Anexada -->
+            <!-- Preview da Imagem Anexada -->
             <div id="eleitorFotoPreviewContainer" style="display:none; margin-top:10px;">
               <div class="eleitor-preview-wrap">
-                <img id="eleitorFotoPreviewImg" src="" alt="Título de Eleitor" class="eleitor-preview-img">
-                <button type="button" class="eleitor-remove-foto-btn" onclick="removerFotoTituloAnexada()" title="Remover esta foto">✕</button>
+                <img id="eleitorFotoPreviewImg" src="" alt="Imagem Anexada" class="eleitor-preview-img">
+                <button type="button" class="eleitor-remove-foto-btn" onclick="removerFotoTituloAnexada()" title="Remover esta imagem">✕</button>
               </div>
               <div style="text-align:center; margin-top:6px;">
-                <span class="badge-status oficial" style="font-size:0.72rem;">✓ Documento Fotográfico Anexado</span>
+                <span class="badge-status oficial" style="font-size:0.72rem;">✓ Imagem Anexada</span>
               </div>
             </div>
             <input type="hidden" id="formEleitorFotoBase64">
