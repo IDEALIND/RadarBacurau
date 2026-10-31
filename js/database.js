@@ -101,6 +101,20 @@ class RadarBacurauDB {
           masterUser.senha = "Bacurau123.";
         }
 
+        // Inicializa lista de IDs e nomes de lideranças excluídas (tombstones)
+        if (!this.data.liderancasExcluidasIds || !Array.isArray(this.data.liderancasExcluidasIds)) {
+          this.data.liderancasExcluidasIds = [];
+        } else {
+          // Garante que nenhuma liderança excluída permaneça na lista local
+          this.data.liderancas = (this.data.liderancas || []).filter(l => {
+            const nNorm = (l.nome || "").toLowerCase().trim();
+            return !this.data.liderancasExcluidasIds.some(ex => 
+              String(ex).toLowerCase().trim() === String(l.id).toLowerCase().trim() ||
+              (nNorm !== "" && String(ex).toLowerCase().trim() === nNorm)
+            );
+          });
+        }
+
         // Remove liderança com login 'alter' ou nome 'Altemar Gabriel' se existir
         if (this.data.liderancas && Array.isArray(this.data.liderancas)) {
           this.data.liderancas = this.data.liderancas.filter(l => {
@@ -460,10 +474,25 @@ class RadarBacurauDB {
     if (!this.data.comunidades) this.data.comunidades = [];
     if (!this.data.liderancas) this.data.liderancas = [];
     if (!this.data.usuarios) this.data.usuarios = [];
+    if (!this.data.liderancasExcluidasIds) this.data.liderancasExcluidasIds = [];
 
     let alterado = false;
+    const excluidos = this.data.liderancasExcluidasIds || [];
 
-    // 1. Sincroniza da lista de Lideranças para as Comunidades
+    // 0. Remove lideranças que estão na lista de exclusão (tombstones)
+    if (excluidos.length > 0) {
+      const antesLids = this.data.liderancas.length;
+      this.data.liderancas = this.data.liderancas.filter(l => {
+        const nNorm = (l.nome || "").toLowerCase().trim();
+        return !excluidos.some(ex => 
+          String(ex).toLowerCase().trim() === String(l.id).toLowerCase().trim() ||
+          (nNorm !== "" && String(ex).toLowerCase().trim() === nNorm)
+        );
+      });
+      if (this.data.liderancas.length !== antesLids) alterado = true;
+    }
+
+    // 1. Sincroniza da lista oficial de Lideranças para as Comunidades
     this.data.liderancas.forEach(lid => {
       if (!lid || !lid.nome) return;
       const vinculadas = Array.isArray(lid.comunidadesVinculadas) ? lid.comunidadesVinculadas : [];
@@ -480,14 +509,36 @@ class RadarBacurauDB {
       });
     });
 
-    // 2. Sincroniza das Comunidades para a lista de Lideranças
+    // 2. Se a comunidade tem liderança que NÃO existe mais na lista ou foi excluída, desvincula
     this.data.comunidades.forEach(com => {
       const nomeLid = (com.liderancaNome || "").trim();
-      if (!nomeLid) return;
+      const nomeLidNorm = nomeLid.toLowerCase();
+      if (!nomeLid) {
+        if (com.liderancaResponsavelId) {
+          com.liderancaResponsavelId = null;
+          alterado = true;
+        }
+        return;
+      }
+
+      // Se a liderança está na lista de tombstones/excluídas, desvincula imediatamente
+      const estaExcluido = excluidos.some(ex => 
+        String(ex).toLowerCase().trim() === String(com.liderancaResponsavelId || "").toLowerCase().trim() ||
+        (nomeLidNorm !== "" && String(ex).toLowerCase().trim() === nomeLidNorm)
+      );
+
+      if (estaExcluido) {
+        com.liderancaNome = null;
+        com.liderancaResponsavelId = null;
+        com.liderancaContato = null;
+        com.votosConseguidos = 0;
+        alterado = true;
+        return;
+      }
 
       let lid = this.data.liderancas.find(l => 
         (com.liderancaResponsavelId && l.id === com.liderancaResponsavelId) ||
-        (l.nome && l.nome.toLowerCase().trim() === nomeLid.toLowerCase())
+        (l.nome && l.nome.toLowerCase().trim() === nomeLidNorm)
       );
 
       if (lid) {
@@ -501,29 +552,25 @@ class RadarBacurauDB {
           alterado = true;
         }
       } else {
-        const novoLid = {
-          id: "lid-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
-          nome: nomeLid,
-          apelido: "",
-          telefone: com.liderancaContato || "",
-          cargoPapel: "Líder de Bairro / Localidade",
-          comunidadesVinculadas: [com.id],
-          status: "Ativo",
-          dataInicio: new Date().toISOString().split("T")[0],
-          votosTotaisConseguidos: Number(com.votosConseguidos) || 0,
-          observacoes: com.observacoes || ""
-        };
-        this.data.liderancas.push(novoLid);
-        com.liderancaResponsavelId = novoLid.id;
+        // A liderança NÃO existe na lista oficial! Desvincula da comunidade sem recriar
+        com.liderancaNome = null;
+        com.liderancaResponsavelId = null;
+        com.liderancaContato = null;
+        com.votosConseguidos = 0;
         alterado = true;
-
-        if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
-          SupabaseClient.salvarLiderancaNuvem(novoLid);
-        }
       }
     });
 
-    // 3. Sincroniza Usuários com perfil 'LIDERANÇA COMUNITÁRIA'
+    // 3. Limpa comunidadesVinculadas das lideranças que apontam para bairros inexistentes
+    this.data.liderancas.forEach(lid => {
+      if (Array.isArray(lid.comunidadesVinculadas)) {
+        const antes = lid.comunidadesVinculadas.length;
+        lid.comunidadesVinculadas = lid.comunidadesVinculadas.filter(cid => this.getComunidadeById(cid));
+        if (lid.comunidadesVinculadas.length !== antes) alterado = true;
+      }
+    });
+
+    // 4. Usuários com perfil 'LIDERANÇA COMUNITÁRIA': garante que apontam para liderança existente
     this.data.usuarios.forEach(u => {
       if (u.perfil === "LIDERANÇA COMUNITÁRIA") {
         let lid = this.data.liderancas.find(l => 
@@ -531,38 +578,12 @@ class RadarBacurauDB {
           (l.login && l.login.toLowerCase() === (u.login || "").toLowerCase()) ||
           (l.nome && l.nome.toLowerCase().trim() === (u.nome || "").toLowerCase().trim())
         );
-        if (!lid) {
-          lid = {
-            id: u.liderancaId || ("lid-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4)),
-            nome: u.nome,
-            apelido: "",
-            telefone: u.telefone || "",
-            cargoPapel: "Líder Comunitário",
-            comunidadesVinculadas: Array.isArray(u.comunidadesVinculadas) ? u.comunidadesVinculadas : (u.comunidadeId ? [u.comunidadeId] : []),
-            login: u.login,
-            senha: u.senha,
-            status: u.status || "Ativo",
-            dataInicio: new Date().toISOString().split("T")[0],
-            votosTotaisConseguidos: 0,
-            observacoes: ""
-          };
-          u.liderancaId = lid.id;
-          this.data.liderancas.push(lid);
-          alterado = true;
-          if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
-            SupabaseClient.salvarLiderancaNuvem(lid);
-          }
-        }
-        
-        const vincs = Array.isArray(u.comunidadesVinculadas) ? u.comunidadesVinculadas : (u.comunidadeId ? [u.comunidadeId] : []);
-        vincs.forEach(cid => {
-          const c = this.getComunidadeById(cid);
-          if (c && (!c.liderancaNome || c.liderancaNome !== u.nome)) {
-            c.liderancaNome = u.nome;
-            c.liderancaResponsavelId = lid ? lid.id : u.id;
+        if (lid) {
+          if (u.liderancaId !== lid.id) {
+            u.liderancaId = lid.id;
             alterado = true;
           }
-        });
+        }
       }
     });
 
@@ -571,12 +592,16 @@ class RadarBacurauDB {
     }
   }
 
-  atribuirLiderancaAoBairro(comunidadeId, nomeLideranca, votosConseguidos, metaVotos = null, contato = "", obs = "") {
+  atribuirLiderancaAoBairro(comunidadeId, nomeLideranca, votosConseguidos = 0, metaVotos = null, contato = "", obs = "") {
     const com = this.getComunidadeById(comunidadeId);
     if (!com) return null;
 
     nomeLideranca = (nomeLideranca || "").trim();
     const votos = parseInt(votosConseguidos) || 0;
+
+    const lidIdAnterior = com.liderancaResponsavelId;
+    const lidNomeAnterior = (com.liderancaNome || "").trim();
+    const lidNomeAnteriorNorm = lidNomeAnterior.toLowerCase();
 
     com.liderancaNome = nomeLideranca || null;
     com.votosConseguidos = votos;
@@ -588,10 +613,11 @@ class RadarBacurauDB {
 
     if (contato) com.liderancaContato = contato;
 
-    let lidSalvo = null;
+    const lidsParaSalvar = [];
+
     if (nomeLideranca) {
       let lid = (this.data.liderancas || []).find(l => 
-        (com.liderancaResponsavelId && l.id === com.liderancaResponsavelId) ||
+        (lidIdAnterior && l.id === lidIdAnterior) ||
         (l.nome && l.nome.toLowerCase().trim() === nomeLideranca.toLowerCase())
       );
       if (!lid) {
@@ -616,25 +642,65 @@ class RadarBacurauDB {
         lid.votosTotaisConseguidos = (lid.votosTotaisConseguidos || 0) + votos;
       }
       com.liderancaResponsavelId = lid.id;
-      lidSalvo = lid;
+      lidsParaSalvar.push(lid);
+
+      // Garante que NENHUMA outra liderança continue com este bairro vinculado
+      (this.data.liderancas || []).forEach(l => {
+        if (l.id !== lid.id && Array.isArray(l.comunidadesVinculadas) && l.comunidadesVinculadas.includes(comunidadeId)) {
+          l.comunidadesVinculadas = l.comunidadesVinculadas.filter(id => id !== comunidadeId);
+          lidsParaSalvar.push(l);
+        }
+      });
+
       this.logAuditoria("Mapeamento Territorial", "Mapa / Bairro", `Bairro "${com.nome}" mapeado com líder "${nomeLideranca}", ${votos} votos e meta de ${com.metaVotos} votos.`);
     } else {
-      if (com.liderancaResponsavelId) {
-        const lidAntigo = (this.data.liderancas || []).find(l => l.id === com.liderancaResponsavelId);
-        if (lidAntigo && Array.isArray(lidAntigo.comunidadesVinculadas)) {
-          lidAntigo.comunidadesVinculadas = lidAntigo.comunidadesVinculadas.filter(id => id !== comunidadeId);
-          lidSalvo = lidAntigo;
+      // DESVINCULAÇÃO COMPLETA: remove este bairro de TODAS as lideranças
+      (this.data.liderancas || []).forEach(l => {
+        let mudou = false;
+        if (Array.isArray(l.comunidadesVinculadas) && l.comunidadesVinculadas.includes(comunidadeId)) {
+          l.comunidadesVinculadas = l.comunidadesVinculadas.filter(id => id !== comunidadeId);
+          mudou = true;
         }
+        const match = (lidIdAnterior && l.id === lidIdAnterior) ||
+                      (lidNomeAnteriorNorm && l.nome && l.nome.toLowerCase().trim() === lidNomeAnteriorNorm);
+        if (match && Array.isArray(l.comunidadesVinculadas) && l.comunidadesVinculadas.includes(comunidadeId)) {
+          l.comunidadesVinculadas = l.comunidadesVinculadas.filter(id => id !== comunidadeId);
+          mudou = true;
+        }
+        if (mudou) {
+          lidsParaSalvar.push(l);
+        }
+      });
+
+      // Também remove este bairro de usuários vinculados em usuarios
+      if (this.data.usuarios) {
+        this.data.usuarios.forEach(u => {
+          let mudouUsr = false;
+          if (Array.isArray(u.comunidadesVinculadas) && u.comunidadesVinculadas.includes(comunidadeId)) {
+            u.comunidadesVinculadas = u.comunidadesVinculadas.filter(id => id !== comunidadeId);
+            mudouUsr = true;
+          }
+          if (u.comunidadeId === comunidadeId) {
+            u.comunidadeId = null;
+            mudouUsr = true;
+          }
+          if (mudouUsr && typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
+            SupabaseClient.salvarUsuarioNuvem(u);
+          }
+        });
       }
+
       com.liderancaResponsavelId = null;
       com.liderancaNome = null;
-      this.logAuditoria("Desvinculação", "Mapa / Bairro", `Liderança removida do bairro "${com.nome}".`);
+      com.liderancaContato = null;
+      com.votosConseguidos = 0;
+      this.logAuditoria("Desvinculação", "Mapa / Bairro", `Liderança "${lidNomeAnterior || 'atribuída'}" removida do bairro "${com.nome}".`);
     }
 
     this.save();
 
-    if (lidSalvo && typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
-      SupabaseClient.salvarLiderancaNuvem(lidSalvo);
+    if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
+      lidsParaSalvar.forEach(l => SupabaseClient.salvarLiderancaNuvem(l));
     }
 
     return com;
@@ -689,6 +755,16 @@ class RadarBacurauDB {
   // --- LIDERANÇAS ---
   getLiderancas(filtros = {}) {
     let list = this.data.liderancas || [];
+    const excluidos = this.data.liderancasExcluidasIds || [];
+    if (excluidos.length > 0) {
+      list = list.filter(l => {
+        const nNorm = (l.nome || "").toLowerCase().trim();
+        return !excluidos.some(ex => 
+          String(ex).toLowerCase().trim() === String(l.id).toLowerCase().trim() ||
+          (nNorm !== "" && String(ex).toLowerCase().trim() === nNorm)
+        );
+      });
+    }
     if (filtros.status) {
       list = list.filter(l => l.status === filtros.status);
     }
@@ -705,13 +781,26 @@ class RadarBacurauDB {
   }
 
   getLiderancaById(id) {
-    return (this.data.liderancas || []).find(l => l.id === id);
+    if (!id) return null;
+    const excluidos = this.data.liderancasExcluidasIds || [];
+    if (excluidos.some(ex => String(ex).toLowerCase().trim() === String(id).toLowerCase().trim())) {
+      return null;
+    }
+    return (this.data.liderancas || []).find(l => String(l.id) === String(id));
   }
 
   saveLideranca(dados) {
     if (!this.data.liderancas) this.data.liderancas = [];
     if (dados.login) {
       dados.login = String(dados.login).trim().toLowerCase();
+    }
+
+    const nomeNorm = (dados.nome || "").toLowerCase().trim();
+    if (this.data.liderancasExcluidasIds && Array.isArray(this.data.liderancasExcluidasIds)) {
+      this.data.liderancasExcluidasIds = this.data.liderancasExcluidasIds.filter(ex => 
+        String(ex).toLowerCase().trim() !== String(dados.id || "").toLowerCase().trim() &&
+        String(ex).toLowerCase().trim() !== nomeNorm
+      );
     }
 
     if (!dados.id) {
@@ -769,35 +858,86 @@ class RadarBacurauDB {
 
   deleteLideranca(id) {
     if (!this.data.liderancas) return false;
-    const item = this.getLiderancaById(id);
+    let item = this.getLiderancaById(id);
+    if (!item) {
+      item = this.data.liderancas.find(l => String(l.id) === String(id));
+    }
     if (!item) return false;
-    this.data.liderancas = this.data.liderancas.filter(l => l.id !== id);
 
-    // Remove usuário vinculado da lista de usuários, se houver
-    if (this.data.usuarios) {
-      this.data.usuarios = this.data.usuarios.filter(u => 
-        u.id !== ("usr-lid-" + id) && 
-        u.liderancaId !== id && 
-        (!item.login || u.login !== item.login)
-      );
+    const nomeNorm = (item.nome || "").toLowerCase().trim();
+    const loginNorm = (item.login || "").toLowerCase().trim();
+    const nomeOriginal = item.nome || "";
+
+    // 0. Grava nos tombstones (liderancasExcluidasIds) para a nuvem NUNCA ressuscitar esta liderança
+    if (!this.data.liderancasExcluidasIds) this.data.liderancasExcluidasIds = [];
+    if (id && !this.data.liderancasExcluidasIds.includes(String(id))) {
+      this.data.liderancasExcluidasIds.push(String(id));
+    }
+    if (nomeNorm && !this.data.liderancasExcluidasIds.includes(nomeNorm)) {
+      this.data.liderancasExcluidasIds.push(nomeNorm);
     }
 
-    // Desvincula comunidades associadas a esta liderança
+    // 1. Remove da lista de lideranças (pelo ID ou por nome idêntico duplicado)
+    this.data.liderancas = this.data.liderancas.filter(l => 
+      String(l.id) !== String(id) && 
+      (!nomeNorm || (l.nome || "").toLowerCase().trim() !== nomeNorm)
+    );
+
+    // 2. Remove usuário vinculado da lista local e guarda IDs para excluir na nuvem
+    const usuariosParaRemoverIds = [];
+    if (this.data.usuarios) {
+      this.data.usuarios = this.data.usuarios.filter(u => {
+        const uId = u.id || "";
+        const uLidId = u.liderancaId || "";
+        const uLogin = (u.login || "").toLowerCase().trim();
+        const uNome = (u.nome || "").toLowerCase().trim();
+
+        const match = uId === ("usr-lid-" + id) || 
+                      uLidId === id || 
+                      (loginNorm && uLogin === loginNorm) ||
+                      (nomeNorm && uNome === nomeNorm && u.perfil === "LIDERANÇA COMUNITÁRIA");
+        if (match) {
+          usuariosParaRemoverIds.push(u.id);
+          return false;
+        }
+        return true;
+      });
+    }
+
+    // 3. Desvincula comunidades associadas a esta liderança
     if (this.data.comunidades) {
       this.data.comunidades.forEach(c => {
-        if (c.liderancaResponsavelId === id || (c.liderancaNome && c.liderancaNome.toLowerCase() === (item.nome || "").toLowerCase())) {
+        const cLidNome = (c.liderancaNome || "").toLowerCase().trim();
+        const cLidId = c.liderancaResponsavelId;
+        const pertenceVinculadas = Array.isArray(item.comunidadesVinculadas) && item.comunidadesVinculadas.includes(c.id);
+
+        if (cLidId === id || (nomeNorm && cLidNome === nomeNorm) || pertenceVinculadas) {
           c.liderancaNome = null;
           c.liderancaResponsavelId = null;
           c.liderancaContato = null;
-          c.votosConquistados = 0;
+          c.votosConseguidos = 0;
         }
       });
     }
 
-    this.logAuditoria("Exclusão de Liderança", "Lideranças", `Removida liderança "${item.nome}".`);
+    // 4. Desvincula eleitores vinculados a esta liderança
+    if (this.data.eleitores) {
+      this.data.eleitores.forEach(e => {
+        const eLidNome = (e.liderancaNome || "").toLowerCase().trim();
+        const eLidId = e.liderancaId;
+        if (eLidId === id || (nomeNorm && eLidNome === nomeNorm)) {
+          e.liderancaId = null;
+          e.liderancaNome = "";
+        }
+      });
+    }
+
+    this.logAuditoria("Exclusão de Liderança", "Lideranças", `Removida liderança "${nomeOriginal}".`);
     this.save();
+
+    // 5. Exclui no Supabase (liderança e credenciais de acesso)
     if (typeof SupabaseClient !== "undefined" && SupabaseClient.isConnected()) {
-      SupabaseClient.excluirLiderancaNuvem(id);
+      SupabaseClient.excluirLiderancaNuvem(id, usuariosParaRemoverIds, nomeOriginal);
     }
     return true;
   }
@@ -1664,15 +1804,16 @@ class RadarBacurauDB {
     // 2. Limpa todas as demandas comunitárias
     this.data.demandas = [];
 
-    // 3. Limpa todas as lideranças
+    // 3. Limpa todas as lideranças e lista de exclusões
     this.data.liderancas = [];
+    this.data.liderancasExcluidasIds = [];
 
     // 4. Desvincula lideranças dos Bairros e Comunidades
     if (this.data.comunidades && Array.isArray(this.data.comunidades)) {
       this.data.comunidades.forEach(com => {
-        com.liderancaNome = "";
+        com.liderancaNome = null;
         com.liderancaResponsavelId = null;
-        com.liderancaContato = "";
+        com.liderancaContato = null;
         com.votosConseguidos = 0;
       });
     }

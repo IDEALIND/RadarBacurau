@@ -148,11 +148,23 @@ const SupabaseClient = {
         });
       }
 
-      // 2. Puxar Lideranças da Nuvem
+      // 2. Puxar Lideranças da Nuvem (ignora e descarta lideranças excluídas localmente)
       const { data: lidsNuvem, error: errLids } = await this.client.from("liderancas").select("*");
       if (!errLids && Array.isArray(lidsNuvem) && lidsNuvem.length > 0) {
         if (!db.data.liderancas) db.data.liderancas = [];
+        const excluidos = db.data.liderancasExcluidasIds || [];
         lidsNuvem.forEach(lNuvem => {
+          const nomeNorm = (lNuvem.nome || "").toLowerCase().trim();
+          const estaExcluido = excluidos.some(ex => 
+            String(ex).toLowerCase().trim() === String(lNuvem.id).toLowerCase().trim() ||
+            (nomeNorm !== "" && String(ex).toLowerCase().trim() === nomeNorm)
+          );
+          if (estaExcluido) {
+            // Garante que é deletado na nuvem e NUNCA adiciona localmente
+            this.excluirLiderancaNuvem(lNuvem.id, [], lNuvem.nome);
+            return;
+          }
+
           const idx = db.data.liderancas.findIndex(l => l.id === lNuvem.id);
           if (idx !== -1) {
             db.data.liderancas[idx] = { ...db.data.liderancas[idx], ...lNuvem };
@@ -290,16 +302,27 @@ const SupabaseClient = {
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "liderancas" }, payload => {
           console.log("⚡ [Realtime] Mudança em Lideranças recebida da nuvem:", payload);
+          const excluidos = db.data.liderancasExcluidasIds || [];
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-            const idx = (db.data.liderancas || []).findIndex(l => l.id === payload.new.id);
+            const itemNew = payload.new;
+            const nNorm = (itemNew?.nome || "").toLowerCase().trim();
+            const estaExcluido = excluidos.some(ex => 
+              String(ex).toLowerCase().trim() === String(itemNew?.id).toLowerCase().trim() ||
+              (nNorm !== "" && String(ex).toLowerCase().trim() === nNorm)
+            );
+            if (estaExcluido) {
+              this.excluirLiderancaNuvem(itemNew?.id, [], itemNew?.nome);
+              return;
+            }
+            const idx = (db.data.liderancas || []).findIndex(l => l.id === itemNew.id);
             if (idx !== -1) {
-              db.data.liderancas[idx] = payload.new;
+              db.data.liderancas[idx] = itemNew;
             } else {
               if (!db.data.liderancas) db.data.liderancas = [];
-              db.data.liderancas.unshift(payload.new);
+              db.data.liderancas.unshift(itemNew);
             }
           } else if (payload.eventType === "DELETE") {
-            db.data.liderancas = (db.data.liderancas || []).filter(l => l.id !== payload.old.id);
+            db.data.liderancas = (db.data.liderancas || []).filter(l => l.id !== payload.old?.id);
           }
           db.sincronizarLiderancasComBairros();
           db.save();
@@ -391,12 +414,38 @@ const SupabaseClient = {
     }
   },
 
-  async excluirLiderancaNuvem(liderancaId) {
-    if (!this.isConnected() || !liderancaId) return;
+  async excluirLiderancaNuvem(liderancaId, usuarioIds = [], nomeLideranca = "") {
+    if (!this.isConnected()) return;
     try {
-      await this.client.from("liderancas").delete().eq("id", liderancaId);
+      if (liderancaId) {
+        await this.client.from("liderancas").delete().eq("id", liderancaId);
+        await this.client.from("usuarios").delete().eq("liderancaId", liderancaId);
+        await this.client.from("usuarios").delete().eq("id", "usr-lid-" + liderancaId);
+      }
+      if (nomeLideranca && nomeLideranca.trim()) {
+        await this.client.from("liderancas").delete().ilike("nome", nomeLideranca.trim());
+        await this.client.from("usuarios").delete().ilike("nome", nomeLideranca.trim());
+      }
+      if (Array.isArray(usuarioIds) && usuarioIds.length > 0) {
+        for (const uId of usuarioIds) {
+          if (uId) {
+            await this.client.from("usuarios").delete().eq("id", uId);
+          }
+        }
+      }
+      console.log(`☁️ [Supabase] Liderança ${liderancaId || ''} (${nomeLideranca || ''}) excluída.`);
     } catch (e) {
       console.error("Erro ao excluir liderança no Supabase:", e);
+    }
+  },
+
+  async excluirUsuarioNuvem(usuarioId) {
+    if (!this.isConnected() || !usuarioId) return;
+    try {
+      await this.client.from("usuarios").delete().eq("id", usuarioId);
+      console.log(`☁️ [Supabase] Usuário ${usuarioId} excluído.`);
+    } catch (e) {
+      console.error("Erro ao excluir usuário no Supabase:", e);
     }
   },
 
@@ -461,7 +510,8 @@ const SupabaseClient = {
       await Promise.allSettled([
         this.client.from("eleitores").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
         this.client.from("demandas").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
-        this.client.from("liderancas").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+        this.client.from("liderancas").delete().neq("id", "00000000-0000-0000-0000-000000000000"),
+        this.client.from("usuarios").delete().eq("perfil", "LIDERANÇA COMUNITÁRIA")
       ]);
     } catch (e) {
       console.warn("Aviso ao resetar tabelas operacionais no Supabase:", e);

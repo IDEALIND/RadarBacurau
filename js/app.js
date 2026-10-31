@@ -592,19 +592,6 @@ function carregarMarcadoresMapa() {
     let temLider = Boolean(nomeLider !== "");
 
     if (!temLider) {
-      const lidVinculada = (db.data.liderancas || []).find(l => 
-        (com.liderancaResponsavelId && l.id === com.liderancaResponsavelId) ||
-        (Array.isArray(l.comunidadesVinculadas) && l.comunidadesVinculadas.includes(com.id))
-      );
-      if (lidVinculada && lidVinculada.nome) {
-        com.liderancaNome = lidVinculada.nome;
-        com.liderancaResponsavelId = lidVinculada.id;
-        nomeLider = lidVinculada.nome;
-        temLider = true;
-      }
-    }
-
-    if (!temLider) {
       nomeLider = "Sem líder atribuído";
     }
     const votos = Number(com.votosConseguidos) || 0;
@@ -1425,10 +1412,6 @@ function renderTabelaLocalidadesMapa() {
       const lid = (db.data.liderancas || []).find(l => l.id === c.liderancaResponsavelId);
       if (lid && lid.nome) nomeLider = lid.nome;
     }
-    if (!nomeLider) {
-      const lid = (db.data.liderancas || []).find(l => Array.isArray(l.comunidadesVinculadas) && l.comunidadesVinculadas.includes(c.id));
-      if (lid && lid.nome) nomeLider = lid.nome;
-    }
     const temLider = Boolean(nomeLider !== "");
     const votos = Number(c.votosConseguidos) || 0;
     const meta = Number(c.metaVotos) || Math.max(30, Math.round((c.eleitoresEstimados || 200) * 0.4));
@@ -1608,7 +1591,17 @@ function salvarLiderancaEBairroModal() {
   }
 
   if (!nomeLider) {
-    alert("Por favor, informe o nome da liderança que cuidará deste bairro.");
+    const comAtualizada = db.atribuirLiderancaAoBairro(bairroId, null, votos, metaVotos, "", obs);
+    closeModal("modalMapearLiderBairro");
+    showToast(`🎯 Bairro "${comAtualizada ? comAtualizada.nome : ''}": Salvo sem líder atribuído.`);
+    carregarMarcadoresMapa();
+    renderTabelaLocalidadesMapa();
+    renderComunidades();
+    renderLiderancas();
+    atualizarMetometroConsolidado();
+    if (AppState.isHeatmapActive) alternarHeatmap(true);
+    updateSidebarCounters();
+    if (AppState.map) AppState.map.closePopup();
     return;
   }
 
@@ -1638,8 +1631,11 @@ function removerLiderancaDoBairroModal() {
     showToast(`Liderança removida do bairro "${com.nome}".`);
     carregarMarcadoresMapa();
     renderTabelaLocalidadesMapa();
+    renderComunidades();
+    renderLiderancas();
     atualizarMetometroConsolidado();
     updateSidebarCounters();
+    if (AppState.map) AppState.map.closePopup();
   }
 }
 
@@ -2168,25 +2164,6 @@ function renderLiderancas() {
   const searchInput = document.getElementById("searchLiderancaInput")?.value?.toLowerCase() || "";
   const statusFilter = document.getElementById("filtroStatusLideranca")?.value || "";
 
-  // Sincroniza lideranças criadas via comunidades caso não existam em db.data.liderancas
-  const coms = db.getComunidades();
-  coms.forEach(c => {
-    if (c.liderancaNome) {
-      const existe = (db.data.liderancas || []).some(l => l.nome && l.nome.toLowerCase() === c.liderancaNome.toLowerCase());
-      if (!existe) {
-        db.saveLideranca({
-          nome: c.liderancaNome,
-          apelido: "",
-          telefone: c.liderancaContato || "",
-          cargoPapel: "Líder de Bairro",
-          status: "Ativo",
-          dataInicio: new Date().toISOString().split("T")[0],
-          comunidadesVinculadas: [c.id],
-          observacoes: ""
-        });
-      }
-    }
-  });
 
   let lids = db.getLiderancas();
   if (statusFilter) {
@@ -2396,15 +2373,21 @@ function salvarFormLideranca() {
 }
 
 function excluirLideranca(id) {
-  const lid = db.getLiderancaById(id);
-  if (!lid) return;
-  if (confirm(`Tem certeza que deseja excluir/remover a liderança "${lid.nome}"?`)) {
+  let lid = db.getLiderancaById(id);
+  if (!lid && db.data && Array.isArray(db.data.liderancas)) {
+    lid = db.data.liderancas.find(l => String(l.id) === String(id));
+  }
+  const nomeLid = lid ? lid.nome : "esta liderança";
+  if (confirm(`Tem certeza que deseja excluir/remover a liderança "${nomeLid}"?`)) {
     db.deleteLideranca(id);
-    showToast(`Liderança "${lid.nome}" removida com sucesso.`);
+    showToast(`Liderança "${nomeLid}" removida com sucesso.`);
     renderLiderancas();
     renderComunidades();
     carregarMarcadoresMapa();
+    renderTabelaLocalidadesMapa();
+    atualizarMetometroConsolidado();
     updateSidebarCounters();
+    if (AppState.map) AppState.map.closePopup();
   }
 }
 
@@ -2423,6 +2406,8 @@ function removerLiderancaDoBairroDireto(bairroId) {
     showToast(`Liderança removida do bairro "${com.nome}".`);
     carregarMarcadoresMapa();
     renderTabelaLocalidadesMapa();
+    renderComunidades();
+    renderLiderancas();
     atualizarMetometroConsolidado();
     updateSidebarCounters();
     if (AppState.map) AppState.map.closePopup();
