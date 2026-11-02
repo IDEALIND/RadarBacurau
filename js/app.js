@@ -1959,20 +1959,263 @@ function imprimirFichaCampo() {
 // ==========================================================================
 function renderDashboard() {
   const stats = db.getDashboardStats();
+  const coms = db.getComunidades() || [];
+  const resultadosPref2024 = db.getResultadosEleitorais({ ano: 2024, cargo: "Prefeito" }) || [];
 
+  // Agregar dados oficiais das 16 seções para Prefeito (2024)
+  let totalAptos = 0;
+  let totalComparecimento = 0;
+  let totalAbstencao = 0;
+  let totalValidos = 0;
+  let totalBrancos = 0;
+  let totalNulos = 0;
+  const candMap = {};
+
+  resultadosPref2024.forEach(r => {
+    totalAptos += Number(r.aptos || 0);
+    totalComparecimento += Number(r.comparecimento || 0);
+    totalAbstencao += Number(r.abstencao || 0);
+    totalValidos += Number(r.votosValidos || 0);
+    totalBrancos += Number(r.votosBrancos || 0);
+    totalNulos += Number(r.votosNulos || 0);
+
+    (r.candidatos || []).forEach(c => {
+      const key = c.numero || c.nome;
+      if (!candMap[key]) {
+        candMap[key] = {
+          nome: c.nome,
+          numero: c.numero || "",
+          partido: c.partido || "",
+          situacao: c.situacao || "",
+          votos: 0
+        };
+      }
+      candMap[key].votos += Number(c.votos || 0);
+      if (c.situacao && !candMap[key].situacao) {
+        candMap[key].situacao = c.situacao;
+      }
+    });
+  });
+
+  const candidatosConsolidados = Object.values(candMap).sort((a, b) => b.votos - a.votos);
+  candidatosConsolidados.forEach(c => {
+    c.percentual = totalValidos > 0 ? ((c.votos / totalValidos) * 100).toFixed(2) : "0.00";
+  });
+
+  // KPIs
   const elComs = document.getElementById("kpi-comunidades");
   const elComsSub = document.getElementById("kpi-comunidades-sub");
   const elLids = document.getElementById("kpi-liderancas");
   const elLidsSub = document.getElementById("kpi-liderancas-sub");
   const elSecs = document.getElementById("kpi-secoes");
+  const elSecsSub = document.getElementById("kpi-secoes-sub");
   const elVotos = document.getElementById("kpi-votos");
+  const elVotosSub = document.getElementById("kpi-votos-sub");
+  const elPend = document.getElementById("kpi-pendencias");
+  const elPendSub = document.getElementById("kpi-pendencias-sub");
+  const elLastUpdated = document.getElementById("lastUpdatedText");
 
   if (elComs) elComs.textContent = stats.totalComunidades;
   if (elComsSub) elComsSub.textContent = `${stats.bairrosCount} Bairros • ${stats.assentamentosCount} Assentamentos`;
-  if (elLids) elLids.textContent = stats.bairrosComLideranca;
-  if (elLidsSub) elLidsSub.textContent = `${stats.bairrosComLideranca} Bairros com líder`;
+  if (elLids) elLids.textContent = stats.totalLiderancas || stats.bairrosComLideranca;
+  if (elLidsSub) elLidsSub.textContent = `${stats.bairrosComLideranca} localidades com líder vinculado`;
   if (elSecs) elSecs.textContent = stats.totalSecoes;
-  if (elVotos) elVotos.textContent = Number(stats.totalVotosContabilizados).toLocaleString("pt-BR");
+  if (elSecsSub) elSecsSub.textContent = `100% Oficial TSE • 8ª Zona (${resultadosPref2024.length || stats.totalSecoes} seções)`;
+
+  const votosExibicao = totalValidos > 0 ? totalValidos : Number(stats.totalVotosContabilizados || 0);
+  if (elVotos) elVotos.textContent = votosExibicao.toLocaleString("pt-BR");
+  if (elVotosSub) {
+    elVotosSub.textContent = totalComparecimento > 0
+      ? `${totalComparecimento.toLocaleString("pt-BR")} comparecimentos nas 16 seções`
+      : "Votos válidos mapeados (TSE 2024)";
+  }
+
+  const pendenciasCount = coms.filter(c => c.statusConferencia && c.statusConferencia !== "Oficial Confirmado").length;
+  if (elPend) elPend.textContent = pendenciasCount;
+  if (elPendSub) {
+    elPendSub.textContent = pendenciasCount > 0
+      ? `${pendenciasCount} localidades aguardando validação`
+      : "100% conferido e validado";
+  }
+
+  if (elLastUpdated) {
+    const agora = new Date();
+    elLastUpdated.textContent = agora.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+
+  // Resumo Visual: Votação Consolidada — Prefeito (2024)
+  const resumoContainer = document.getElementById("dashPrefeito2024Resumo");
+  if (resumoContainer) {
+    if (candidatosConsolidados.length === 0) {
+      resumoContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; padding:12px;">Nenhum resultado de 2024 encontrado.</div>`;
+    } else {
+      const diffVotos = candidatosConsolidados.length >= 2
+        ? candidatosConsolidados[0].votos - candidatosConsolidados[1].votos
+        : 0;
+
+      const cardsHtml = candidatosConsolidados.map((c, idx) => {
+        const isEleito = (c.situacao || "").toLowerCase().includes("eleito") && !(c.situacao || "").toLowerCase().includes("não");
+        const barColor = idx === 0 ? "linear-gradient(90deg, #10b981, #059669)" : "linear-gradient(90deg, #f59e0b, #d97706)";
+        const borderColor = idx === 0 ? "rgba(16, 185, 129, 0.4)" : "rgba(245, 158, 11, 0.3)";
+        const badgeHtml = isEleito
+          ? `<span class="badge-status oficial" style="font-size:0.68rem; padding:2px 8px;">🏆 ELEITO</span>`
+          : `<span class="badge-status" style="font-size:0.68rem; padding:2px 8px; background:rgba(255,255,255,0.06); color:var(--text-secondary);">2º LUGAR</span>`;
+
+        return `
+          <div style="background:rgba(255,255,255,0.03); border:1px solid ${borderColor}; border-radius:10px; padding:10px 12px; margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="background:rgba(16,185,129,0.15); color:var(--emerald-300); font-weight:800; font-size:0.78rem; padding:2px 7px; border-radius:6px; font-family:monospace;">${c.numero}</span>
+                <strong style="color:#fff; font-size:0.95rem;">${c.nome}</strong>
+                <span style="color:var(--text-muted); font-size:0.78rem;">(${c.partido})</span>
+                ${badgeHtml}
+              </div>
+              <div style="text-align:right;">
+                <strong style="color:${idx === 0 ? "var(--emerald-400)" : "var(--gold-400)"}; font-size:1rem;">${c.votos.toLocaleString("pt-BR")} votos</strong>
+                <span style="color:var(--text-secondary); font-size:0.82rem; margin-left:6px;">(${c.percentual.replace(".", ",")}%)</span>
+              </div>
+            </div>
+            <div style="width:100%; height:8px; background:rgba(255,255,255,0.07); border-radius:999px; overflow:hidden;">
+              <div style="width:${c.percentual}%; height:100%; background:${barColor}; border-radius:999px;"></div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      const taxaComp = totalAptos > 0 ? ((totalComparecimento / totalAptos) * 100).toFixed(1).replace(".", ",") : "0,0";
+
+      resumoContainer.innerHTML = `
+        ${cardsHtml}
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(115px, 1fr)); gap:8px; margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.07); font-size:0.76rem;">
+          <div style="background:rgba(255,255,255,0.02); padding:6px 8px; border-radius:6px;">
+            <span style="color:var(--text-muted); display:block;">Votos Válidos</span>
+            <strong style="color:#fff; font-size:0.88rem;">${totalValidos.toLocaleString("pt-BR")}</strong>
+          </div>
+          <div style="background:rgba(255,255,255,0.02); padding:6px 8px; border-radius:6px;">
+            <span style="color:var(--text-muted); display:block;">Maioria (Diferença)</span>
+            <strong style="color:var(--emerald-400); font-size:0.88rem;">+${diffVotos.toLocaleString("pt-BR")} votos</strong>
+          </div>
+          <div style="background:rgba(255,255,255,0.02); padding:6px 8px; border-radius:6px;">
+            <span style="color:var(--text-muted); display:block;">Comparecimento</span>
+            <strong style="color:#fff; font-size:0.88rem;">${totalComparecimento.toLocaleString("pt-BR")} (${taxaComp}%)</strong>
+          </div>
+          <div style="background:rgba(255,255,255,0.02); padding:6px 8px; border-radius:6px;">
+            <span style="color:var(--text-muted); display:block;">Brancos / Nulos</span>
+            <strong style="color:var(--text-secondary); font-size:0.88rem;">${totalBrancos.toLocaleString("pt-BR")} / ${totalNulos.toLocaleString("pt-BR")}</strong>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // Gráfico Chart.js: Votação Consolidada — Prefeito (2024)
+  const canvasPref = document.getElementById("dashCandidatosChart");
+  if (canvasPref && typeof Chart !== "undefined") {
+    if (AppState.charts.dashCandidatos) {
+      AppState.charts.dashCandidatos.destroy();
+    }
+    const ctx = canvasPref.getContext("2d");
+    const labels = candidatosConsolidados.map(c => `${c.nome} (${c.partido} ${c.numero})`);
+    const dataVotos = candidatosConsolidados.map(c => c.votos);
+    const bgColors = candidatosConsolidados.map((_, idx) =>
+      idx === 0 ? "rgba(16, 185, 129, 0.78)" : "rgba(245, 158, 11, 0.78)"
+    );
+    const borderColors = candidatosConsolidados.map((_, idx) =>
+      idx === 0 ? "#10b981" : "#f59e0b"
+    );
+
+    AppState.charts.dashCandidatos = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Votos Válidos (16 Seções)",
+            data: dataVotos,
+            backgroundColor: bgColors,
+            borderColor: borderColors,
+            borderWidth: 1.5,
+            borderRadius: 8,
+            maxBarThickness: 56
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: "y",
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                const v = Number(context.raw || 0);
+                const pct = totalValidos > 0 ? ((v / totalValidos) * 100).toFixed(2).replace(".", ",") : "0,00";
+                return ` ${v.toLocaleString("pt-BR")} votos (${pct}% dos válidos)`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: "rgba(255,255,255,0.06)" },
+            ticks: {
+              color: "#94a3b8",
+              callback: function (val) {
+                return Number(val).toLocaleString("pt-BR");
+              }
+            }
+          },
+          y: {
+            grid: { display: false },
+            ticks: {
+              color: "#f8fafc",
+              font: { weight: "600", size: 12 }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Tabela: Pólos Territoriais com Maior Eleitorado
+  const topBody = document.getElementById("dashTopLocalidadesBody");
+  if (topBody) {
+    const topComs = [...coms]
+      .sort((a, b) => (Number(b.eleitoresEstimados) || 0) - (Number(a.eleitoresEstimados) || 0))
+      .slice(0, 8);
+
+    if (topComs.length === 0) {
+      topBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:16px;">Nenhuma localidade cadastrada.</td></tr>`;
+    } else {
+      topBody.innerHTML = topComs.map((c, idx) => {
+        const lidBadge = c.liderancaNome
+          ? `<span style="color:var(--emerald-400); font-weight:600;">👤 ${c.liderancaNome}</span>`
+          : `<span style="color:var(--text-muted); font-size:0.78rem;">Sem liderança</span>`;
+        const statusClass = c.statusConferencia === "Oficial Confirmado" ? "oficial" : "estimado";
+        const statusLabel = c.statusConferencia || "Mapeado";
+        return `
+          <tr>
+            <td><strong>${idx + 1}º</strong></td>
+            <td>
+              <strong>${c.nome}</strong>
+              <div style="font-size:0.72rem; color:var(--text-muted);">${c.tipo || ""} • ${c.zona || ""}</div>
+            </td>
+            <td>${lidBadge}</td>
+            <td><strong>${Number(c.eleitoresEstimados || 0).toLocaleString("pt-BR")}</strong></td>
+            <td><span class="badge-status ${statusClass}">${statusLabel}</span></td>
+          </tr>
+        `;
+      }).join("");
+    }
+  }
 }
 
 // ==========================================================================
