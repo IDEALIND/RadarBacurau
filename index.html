@@ -3,10 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RADAR BACURAU — Plataforma Premium de Inteligência Eleitoral | Riachuelo–RN</title>
+  <title>RADAR DE GESTÃO — Plataforma Premium de Inteligência Eleitoral | Riachuelo–RN</title>
   <meta name="description" content="Plataforma de inteligência territorial, acompanhamento de lideranças e análise estatística de resultados eleitorais no município de Riachuelo, Rio Grande do Norte, Brasil.">
   <meta name="referrer" content="origin-when-cross-origin">
-  <link rel="icon" type="image/png" href="assets/radarbacurau.png">
 
   <!-- Estilos Externos: Leaflet com Fallback Anti-Bloqueio -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -41,10 +40,8 @@
        ======================================================================== -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <div class="sidebar-logo-container" onclick="navigateTo('mapa')" style="cursor:pointer;" title="Radar Bacurau — Riachuelo/RN">
-        <img src="assets/radarbacurau.png" alt="Radar Bacurau — Riachuelo/RN" class="sidebar-logo">
-      </div>
-      <div class="sidebar-brand">
+      <div class="sidebar-brand" onclick="navigateTo('mapa')" style="cursor:pointer;" title="Radar de Gestão — Riachuelo/RN">
+        <h1>RADAR DE GESTÃO</h1>
         <p class="sidebar-brand-subtitle">Inteligência Eleitoral</p>
       </div>
     </div>
@@ -159,9 +156,8 @@
     <!-- Header Mobile Exclusivo para Lideranças -->
     <header class="mobile-lideranca-top-header" id="mobileLiderancaTopHeader" style="display:none;">
       <div class="mobile-lideranca-brand">
-        <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="mobile-lideranca-logo">
         <div>
-          <div class="mobile-lideranca-title">RADAR BACURAU</div>
+          <div class="mobile-lideranca-title">RADAR DE GESTÃO</div>
           <div class="mobile-lideranca-sub" id="mobileLiderancaNomeSub">Painel da Liderança</div>
         </div>
       </div>
@@ -178,7 +174,6 @@
     <header class="topbar">
       <div class="topbar-left">
         <button class="mobile-toggle" id="mobileToggle" aria-label="Abrir menu">☰</button>
-        <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="topbar-logo-mobile" onclick="navigateTo('mapa')" title="Radar Bacurau">
         <div class="breadcrumb-area">
           <h2 id="breadcrumbTitle">Painel Principal de Inteligência <span class="breadcrumb-badge">8ª ZONA ELEITORAL</span></h2>
         </div>
@@ -226,7 +221,7 @@
         <div class="hero-radar-banner">
           <div class="hero-content">
             <span class="hero-tag">⚡ MONITORAMENTO GEOELEITORAL EM TEMPO REAL</span>
-            <h2>RADAR BACURAU — RIACHUELO/RN</h2>
+            <h2>RADAR DE GESTÃO — RIACHUELO/RN</h2>
             <p>Plataforma de inteligência territorial com 100% de dados baseados em registros oficiais da Justiça Eleitoral (TRE-RN), INCRA e mapeamento comunitário verificado.</p>
             <div class="hero-actions">
               <button class="btn btn-gold" onclick="navigateTo('mapa')">
@@ -246,7 +241,6 @@
             <div class="radar-circle c2"></div>
             <div class="radar-circle c3"></div>
             <div class="radar-sweep-hand"></div>
-            <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="radar-center-logo">
           </div>
         </div>
 
@@ -647,7 +641,7 @@
             <div class="tse-kpi-sub" id="kpiEleitoresTotalSub">Mapeados por bairro e liderança</div>
           </div>
           <div class="tse-kpi-card">
-            <div class="tse-kpi-label">Títulos Anexados com Foto</div>
+            <div class="tse-kpi-label">Cadastros com Foto Anexada</div>
             <div class="tse-kpi-value" id="kpiEleitoresComFoto">0</div>
             <div class="tse-kpi-sub" id="kpiEleitoresComFotoSub">Documentos fotográficos conferidos</div>
           </div>
@@ -705,7 +699,7 @@
               </div>
               <div class="mobile-stat-box">
                 <span class="mobile-stat-num" id="mobileStatComFoto">0</span>
-                <span class="mobile-stat-lbl">Com Título Foto</span>
+                <span class="mobile-stat-lbl">Com Foto</span>
               </div>
               <div class="mobile-stat-box" style="padding:4px;">
                 <button type="button" class="btn btn-sm" onclick="iniciarDisparoEmMassaEleitores()" style="background:#25D366; color:#000; font-weight:700; width:100%; height:100%; border:none; font-size:0.75rem; border-radius:6px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;">
@@ -719,7 +713,7 @@
           <div class="section-header">
             <div class="section-title-wrap">
               <h3>👥 Base Nominal de Eleitores Cadastrados</h3>
-              <p id="subtituloSecaoEleitores">Mapeamento nominal com rua, endereço, seção, título de eleitor e liderança exclusiva</p>
+              <p id="subtituloSecaoEleitores">Mapeamento nominal com rua, endereço, intenção de voto (prefeito e vereador) e liderança exclusiva</p>
             </div>
             <div class="section-actions">
               <select class="form-select" id="filtroEleitorBairro" onchange="renderEleitores()">
@@ -728,12 +722,9 @@
               <select class="form-select" id="filtroEleitorLideranca" onchange="renderEleitores()">
                 <option value="">Todas as Lideranças</option>
               </select>
-              <select class="form-select" id="filtroEleitorSecao" onchange="renderEleitores()">
-                <option value="">Todas as 16 Seções</option>
-              </select>
               <div class="search-input-wrap">
                 <i>🔍</i>
-                <input type="text" class="form-input" id="searchEleitorInput" placeholder="Buscar por nome, nº do título, rua, bairro..." oninput="renderEleitores()">
+                <input type="text" class="form-input" id="searchEleitorInput" placeholder="Buscar por nome, intenção de voto, rua, bairro..." oninput="renderEleitores()">
               </div>
               <button class="btn btn-gold" onclick="abrirModalNovoEleitor()">+ Cadastrar Eleitor</button>
               <button class="btn btn-primary" onclick="iniciarDisparoEmMassaEleitores()" style="background:#25D366; color:#000; font-weight:700; border:none;" title="Abrir painel de disparo territorial em massa no WhatsApp">💬 Disparo WhatsApp</button>
@@ -755,7 +746,7 @@
           <div class="table-scroll-banner">
             <div style="display:flex; align-items:center; gap:8px;">
               <span>↔️</span>
-              <span><strong>Navegação da Tabela:</strong> Deslize ou use os botões para visualizar todas as colunas de endereço, títulos e fotos</span>
+              <span><strong>Navegação da Tabela:</strong> Deslize ou use os botões para visualizar todas as colunas de endereço, intenção de voto e fotos</span>
             </div>
             <div class="table-scroll-buttons">
               <button type="button" class="table-scroll-btn" onclick="rolarTabelaEleitores('esquerda')">◀ Rolar Esquerda</button>
@@ -768,11 +759,12 @@
               <thead>
                 <tr>
                   <th style="width:70px;">Doc</th>
-                  <th>Eleitor & Nº do Título</th>
+                  <th>Nome do Eleitor</th>
                   <th>Rua / Logradouro</th>
                   <th>Endereço & Complemento</th>
                   <th>Bairro / Comunidade</th>
-                  <th>Seção Eleitoral</th>
+                  <th>Intenção p/ Prefeito</th>
+                  <th>Intenção p/ Vereador</th>
                   <th>Liderança Exclusiva</th>
                   <th>Telefone / Contato</th>
                   <th>Cadastrado em</th>
@@ -1572,7 +1564,7 @@
           <i>🛡️</i>
           <div>
             <strong style="color:#ffffff; font-size:0.95rem;">Conformidade Estrita com a Lei Geral de Proteção de Dados (LGPD - Lei 13.709/2018)</strong>
-            <p>O RADAR BACURAU opera com dados exclusivamente agregados. <strong>É terminantemente vedado</strong> o armazenamento de títulos eleitorais individuais, segredos de voto ou inferências de preferência política pessoal. Os registros abaixo são estritamente administrativos para comunicação institucional e articulação comunitária.</p>
+            <p>O RADAR DE GESTÃO opera com dados exclusivamente agregados. <strong>É terminantemente vedado</strong> o armazenamento de títulos eleitorais individuais, segredos de voto ou inferências de preferência política pessoal. Os registros abaixo são estritamente administrativos para comunicação institucional e articulação comunitária.</p>
           </div>
         </div>
 
@@ -2269,7 +2261,7 @@
     <div class="modal-header">
       <div>
         <h3 id="modalEleitorTitulo">📝 Cadastrar Novo Eleitor</h3>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="modalEleitorSubtitulo">Vincule o eleitor ao seu bairro, seção e liderança responsável exclusiva</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="modalEleitorSubtitulo">Vincule o eleitor ao seu bairro, intenção de voto e liderança responsável exclusiva</p>
       </div>
       <button class="modal-close" onclick="closeModal('modalEleitor')">&times;</button>
     </div>
@@ -2295,25 +2287,22 @@
             <input type="text" class="form-control" id="formEleitorNome" placeholder="Ex: Severino Batista de Lima" required oninput="verificarConflitoEleitorInstantaneo()">
           </div>
 
-          <!-- Número do Título de Eleitor -->
-          <div class="form-group">
-            <label class="form-label">Número do Título de Eleitor *</label>
-            <input type="text" class="form-control" id="formEleitorNumeroTitulo" placeholder="Ex: 0123 4567 2011" maxlength="14" required oninput="formatarTituloInput(this); verificarConflitoEleitorInstantaneo();">
-            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">Documento oficial único de 12 dígitos da Justiça Eleitoral</div>
-          </div>
-
           <!-- Telefone / WhatsApp -->
           <div class="form-group">
             <label class="form-label">Telefone / WhatsApp</label>
             <input type="text" class="form-control" id="formEleitorTelefone" placeholder="Ex: (84) 99876-5432">
           </div>
 
-          <!-- Seção Eleitoral -->
+          <!-- Intenção de Voto para Prefeito -->
           <div class="form-group">
-            <label class="form-label">Seção Eleitoral *</label>
-            <select class="form-control" id="formEleitorSecao" required>
-              <!-- Populado com as 16 seções de Riachuelo -->
-            </select>
+            <label class="form-label">Qual Intenção de Voto para Prefeito?</label>
+            <input type="text" class="form-control" id="formEleitorIntencaoPrefeito" placeholder="Ex: Nome do candidato a Prefeito / Indeciso">
+          </div>
+
+          <!-- Intenção de Voto para Vereador -->
+          <div class="form-group">
+            <label class="form-label">Qual Intenção de Voto para Vereador?</label>
+            <input type="text" class="form-control" id="formEleitorIntencaoVereador" placeholder="Ex: Nome do candidato a Vereador / Indeciso">
           </div>
 
           <!-- Bairro / Comunidade -->
@@ -2394,7 +2383,7 @@
   <div class="modal-container" style="max-width:640px;">
     <div class="modal-header">
       <div>
-        <h3 id="fotoTituloModalNome">📷 Título de Eleitor</h3>
+        <h3 id="fotoTituloModalNome">📷 Documento / Foto do Eleitor</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin:0;" id="fotoTituloModalSub">Comprovante e conferência territorial</p>
       </div>
       <button class="modal-close" onclick="closeModal('modalFotoTitulo')">&times;</button>
@@ -2869,9 +2858,8 @@
   <div class="auth-card">
     <button type="button" class="modal-close" id="btnFecharAuthModal" onclick="fecharTelaLogin()" style="position:absolute; top:12px; right:16px; font-size:1.3rem; z-index:10; display:none;" title="Fechar">&times;</button>
     <div class="auth-header">
-      <img src="assets/radarbacurau.png" alt="Radar Bacurau" class="auth-logo">
-      <div class="auth-title">Acesso Seguro ao Radar Bacurau</div>
-      <div class="auth-subtitle">Plataforma de Inteligência Territorial e Estratégia Eleitoral</div>
+      <div class="auth-title" style="font-size:1.35rem;">RADAR DE GESTÃO</div>
+      <div class="auth-subtitle">Acesso Seguro • Plataforma de Inteligência Territorial e Estratégia Eleitoral</div>
     </div>
 
     <div class="auth-body">

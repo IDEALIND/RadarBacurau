@@ -1190,6 +1190,8 @@ class RadarBacurauDB {
       list = list.filter(e => 
         (e.nome && e.nome.toLowerCase().includes(q)) ||
         (e.numeroTitulo && qDigits && e.numeroTitulo.replace(/\D/g, "").includes(qDigits)) ||
+        (e.intencaoPrefeito && e.intencaoPrefeito.toLowerCase().includes(q)) ||
+        (e.intencaoVereador && e.intencaoVereador.toLowerCase().includes(q)) ||
         (e.rua && e.rua.toLowerCase().includes(q)) ||
         (e.endereco && e.endereco.toLowerCase().includes(q)) ||
         (e.bairroNome && e.bairroNome.toLowerCase().includes(q)) ||
@@ -1309,7 +1311,7 @@ class RadarBacurauDB {
       dados.id = "el-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
       dados.dataCadastro = new Date().toLocaleDateString("pt-BR");
       this.data.eleitores.unshift(dados);
-      this.logAuditoria("Cadastro de Eleitor", "Eleitores", `Cadastrado eleitor exclusivo "${dados.nome}" (Título: ${dados.numeroTitulo || 'S/N'}) no bairro ${dados.bairroNome} (Seção ${dados.secao}, Líder: ${dados.liderancaNome || 'Sem liderança'}).`);
+      this.logAuditoria("Cadastro de Eleitor", "Eleitores", `Cadastrado eleitor exclusivo "${dados.nome}" no bairro ${dados.bairroNome} (Prefeito: ${dados.intencaoPrefeito || 'N/I'}, Vereador: ${dados.intencaoVereador || 'N/I'}, Líder: ${dados.liderancaNome || 'Sem liderança'}).`);
     } else {
       const idx = this.data.eleitores.findIndex(e => e.id === dados.id);
       if (idx !== -1) {

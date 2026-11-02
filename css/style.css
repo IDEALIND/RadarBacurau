@@ -197,7 +197,16 @@ html, body {
 }
 
 .sidebar-brand h1 {
-  display: none; /* A logo já contém a tipografia RADAR BACURAU em 3D de alta definição */
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  margin: 0 0 4px 0;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #ffffff 0%, var(--emerald-400) 60%, var(--gold-400) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .sidebar-brand p,

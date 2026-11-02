@@ -15,6 +15,8 @@ create table if not exists public.eleitores (
   "bairroNome" text,
   "comunidadeId" text,
   secao text,
+  "intencaoPrefeito" text,
+  "intencaoVereador" text,
   zona text default '008',
   "liderancaNome" text,
   "liderancaId" text,

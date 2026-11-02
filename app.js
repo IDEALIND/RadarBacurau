@@ -1840,7 +1840,7 @@ function gerarFichaCampoBairro(bairroId) {
             RB
           </div>
           <div class="ficha-campo-titulo-wrap">
-            <h2>RADAR BACURAU — FICHA DE CAMPO TERRITORIAL</h2>
+            <h2>RADAR DE GESTÃO — FICHA DE CAMPO TERRITORIAL</h2>
             <p>MUNICÍPIO DE RIACHUELO/RN • 8ª ZONA ELEITORAL (TRE-RN) • COORDENAÇÃO DE CAMPANHA</p>
           </div>
         </div>
@@ -1941,7 +1941,7 @@ function gerarFichaCampoBairro(bairroId) {
         <div class="ficha-assinatura-box">
           <div class="ficha-assinatura-linha"></div>
           <div class="ficha-assinatura-nome">Coordenação Geral de Campanha</div>
-          <div class="ficha-assinatura-cargo">Radar Bacurau • Riachuelo–RN</div>
+          <div class="ficha-assinatura-cargo">Radar de Gestão • Riachuelo–RN</div>
         </div>
       </div>
     </div>
@@ -2557,7 +2557,7 @@ function renderEleitores() {
   if (lista.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="10" style="text-align:center; padding:35px; color:var(--text-muted);">
+        <td colspan="11" style="text-align:center; padding:35px; color:var(--text-muted);">
           Nenhum eleitor localizado com os filtros selecionados. Clique em "+ Cadastrar Eleitor" para registrar o primeiro.
         </td>
       </tr>
@@ -2568,17 +2568,14 @@ function renderEleitores() {
   tbody.innerHTML = lista.map(e => {
     const temFoto = e.fotoTitulo && e.fotoTitulo.trim() !== "";
     const fotoHtml = temFoto
-      ? `<img src="${e.fotoTitulo}" class="eleitor-foto-thumb" onclick="abrirFotoTituloModal('${e.id}')" title="Clique para ampliar o título de ${e.nome}">`
-      : `<div class="eleitor-foto-thumb-empty" onclick="editarEleitor('${e.id}')" title="Sem foto anexada. Clique para anexar foto do título.">📷<span>Sem Foto</span></div>`;
-
-    const tituloExibicao = e.numeroTitulo ? formatarTituloExibicao(e.numeroTitulo) : "Não informado";
+      ? `<img src="${e.fotoTitulo}" class="eleitor-foto-thumb" onclick="abrirFotoTituloModal('${e.id}')" title="Clique para ampliar a foto de ${e.nome}">`
+      : `<div class="eleitor-foto-thumb-empty" onclick="editarEleitor('${e.id}')" title="Sem foto anexada. Clique para anexar foto.">📷<span>Sem Foto</span></div>`;
 
     return `
       <tr>
         <td>${fotoHtml}</td>
         <td>
-          <strong style="color:#ffffff; font-size:0.92rem;">${e.nome}</strong><br>
-          <span style="font-family:var(--font-mono); color:var(--gold-400); font-size:0.77rem; display:inline-block; margin-top:2px;">🪪 Título: <strong>${tituloExibicao}</strong></span>
+          <strong style="color:#ffffff; font-size:0.92rem;">${e.nome}</strong>
           ${e.observacoes ? `<div style="font-size:0.73rem; color:var(--text-muted); margin-top:2px;">${e.observacoes.length > 40 ? e.observacoes.slice(0, 40) + '...' : e.observacoes}</div>` : ''}
         </td>
         <td>
@@ -2592,8 +2589,13 @@ function renderEleitores() {
           <strong style="color:var(--emerald-400); font-size:0.85rem;">📍 ${e.bairroNome || '-'}</strong>
         </td>
         <td>
-          <span class="badge-status oficial" style="font-family:var(--font-mono); font-weight:800; font-size:0.78rem; background:rgba(217,119,6,0.18); color:var(--gold-400); border-color:#d97706;">
-            Seção ${e.secao || '-'}
+          <span class="badge-status oficial" style="font-weight:700; font-size:0.78rem; background:rgba(16,185,129,0.18); color:var(--emerald-400); border-color:var(--emerald-500);">
+            🏛️ ${e.intencaoPrefeito || 'Não informado'}
+          </span>
+        </td>
+        <td>
+          <span class="badge-status oficial" style="font-weight:700; font-size:0.78rem; background:rgba(217,119,6,0.18); color:var(--gold-400); border-color:#d97706;">
+            🗳️ ${e.intencaoVereador || 'Não informado'}
           </span>
         </td>
         <td>
@@ -2609,7 +2611,7 @@ function renderEleitores() {
         </td>
         <td>
           <div style="display:flex; gap:6px;">
-            ${temFoto ? `<button class="btn btn-secondary btn-sm" onclick="abrirFotoTituloModal('${e.id}')" title="Ver Foto do Título">📷 Ver Título</button>` : ''}
+            ${temFoto ? `<button class="btn btn-secondary btn-sm" onclick="abrirFotoTituloModal('${e.id}')" title="Ver Foto Anexada">📷 Ver Foto</button>` : ''}
             ${e.telefone ? `<button class="btn btn-secondary btn-sm" onclick="dispararWhatsAppEleitor('${e.id}')" title="Enviar WhatsApp Direto" style="color:#25D366; font-weight:700; font-size:1rem; padding:3px 7px;">💬</button>` : ''}
             <button class="btn btn-primary btn-sm" onclick="editarEleitor('${e.id}')" title="Editar dados do eleitor">✏️</button>
             <button class="btn btn-secondary btn-sm" onclick="excluirEleitor('${e.id}')" title="Excluir cadastro" style="color:#ef4444;">🗑️</button>
@@ -2642,13 +2644,13 @@ function renderEleitores() {
         const telSanitizado = e.telefone ? e.telefone.replace(/\D/g, "") : "";
         const linkWpp = telSanitizado ? `https://api.whatsapp.com/send?phone=55${telSanitizado.replace(/^55/, "")}` : null;
         const fotoHtml = temFoto
-          ? `<img src="${e.fotoTitulo}" alt="Foto Título">`
+          ? `<img src="${e.fotoTitulo}" alt="Foto">`
           : `<span>📷</span>`;
 
         return `
           <div class="eleitor-mobile-card">
             <div class="eleitor-mobile-card-top">
-              <div class="eleitor-mobile-avatar" onclick="${temFoto ? `abrirFotoTituloModal('${e.id}')` : `editarEleitor('${e.id}')`}" title="${temFoto ? 'Ver foto do título' : 'Anexar foto'}">
+              <div class="eleitor-mobile-avatar" onclick="${temFoto ? `abrirFotoTituloModal('${e.id}')` : `editarEleitor('${e.id}')`}" title="${temFoto ? 'Ver foto anexada' : 'Anexar foto'}">
                 ${fotoHtml}
               </div>
               <div class="eleitor-mobile-info">
@@ -2658,8 +2660,9 @@ function renderEleitores() {
                 </div>
                 <div class="eleitor-mobile-badges">
                   <span class="badge-bairro">📍 ${e.bairroNome || '-'}</span>
-                  <span class="badge-secao">Seção ${e.secao || '-'}</span>
-                  ${temFoto ? '<span class="badge-doc">🪪 Título Foto</span>' : ''}
+                  <span class="badge-secao">🏛️ Pref: ${e.intencaoPrefeito || 'N/I'}</span>
+                  <span class="badge-secao">🗳️ Ver: ${e.intencaoVereador || 'N/I'}</span>
+                  ${temFoto ? '<span class="badge-doc">📷 Com Foto</span>' : ''}
                 </div>
               </div>
             </div>
@@ -2883,7 +2886,7 @@ function abrirModalNovoEleitor() {
   const tituloModal = document.getElementById("modalEleitorTitulo");
   const subModal = document.getElementById("modalEleitorSubtitulo");
   if (tituloModal) tituloModal.textContent = "📝 Cadastrar Novo Eleitor";
-  if (subModal) subModal.textContent = "Vincule o eleitor ao seu bairro, seção e liderança exclusiva responsável";
+  if (subModal) subModal.textContent = "Vincule o eleitor ao seu bairro, intenção de voto e liderança exclusiva responsável";
 
   // Popula bairros
   const bairroSelect = document.getElementById("formEleitorBairro");
@@ -2968,9 +2971,14 @@ function editarEleitor(id) {
   const titInput = document.getElementById("formEleitorNumeroTitulo");
   if (titInput) titInput.value = e.numeroTitulo ? formatarTituloExibicao(e.numeroTitulo) : "";
   document.getElementById("formEleitorTelefone").value = e.telefone || "";
+  const prefInput = document.getElementById("formEleitorIntencaoPrefeito");
+  if (prefInput) prefInput.value = e.intencaoPrefeito || "";
+  const verInput = document.getElementById("formEleitorIntencaoVereador");
+  if (verInput) verInput.value = e.intencaoVereador || "";
   document.getElementById("formEleitorBairro").value = e.bairroNome || "";
   document.getElementById("formEleitorLideranca").value = e.liderancaNome || "";
-  document.getElementById("formEleitorSecao").value = e.secao || "";
+  const secInput = document.getElementById("formEleitorSecao");
+  if (secInput) secInput.value = e.secao || "";
   document.getElementById("formEleitorRua").value = e.rua || "";
   document.getElementById("formEleitorNumero").value = e.numero || "";
   document.getElementById("formEleitorEndereco").value = e.endereco || "";
@@ -2987,6 +2995,8 @@ function editarEleitor(id) {
 function salvarFormEleitor() {
   const nome = (document.getElementById("formEleitorNome")?.value || "").trim();
   const numeroTitulo = (document.getElementById("formEleitorNumeroTitulo")?.value || "").trim();
+  const intencaoPrefeito = (document.getElementById("formEleitorIntencaoPrefeito")?.value || "").trim();
+  const intencaoVereador = (document.getElementById("formEleitorIntencaoVereador")?.value || "").trim();
   const bairro = (document.getElementById("formEleitorBairro")?.value || "").trim();
   const rua = (document.getElementById("formEleitorRua")?.value || "").trim();
   const secao = (document.getElementById("formEleitorSecao")?.value || "").trim();
@@ -2996,17 +3006,8 @@ function salvarFormEleitor() {
     document.getElementById("formEleitorNome")?.focus();
     return;
   }
-  if (!numeroTitulo) {
-    showToast("Informe o número do Título de Eleitor.");
-    document.getElementById("formEleitorNumeroTitulo")?.focus();
-    return;
-  }
   if (!bairro) {
     showToast("Selecione o bairro do eleitor.");
-    return;
-  }
-  if (!secao) {
-    showToast("Selecione a seção eleitoral.");
     return;
   }
 
@@ -3028,6 +3029,8 @@ function salvarFormEleitor() {
     id: id || undefined,
     nome: nome,
     numeroTitulo: numeroTitulo,
+    intencaoPrefeito: intencaoPrefeito,
+    intencaoVereador: intencaoVereador,
     rua: rua,
     numero: num,
     endereco: end,
@@ -3104,15 +3107,15 @@ function abrirFotoTituloModal(id) {
 
   const titFormatado = e.numeroTitulo ? formatarTituloExibicao(e.numeroTitulo) : "Não informado";
 
-  if (nomeEl) nomeEl.innerHTML = `📷 Título de Eleitor — <span style="color:var(--gold-400);">${e.nome}</span>`;
-  if (subEl) subEl.textContent = `${e.bairroNome} • Seção ${e.secao} • 8ª Zona Eleitoral • Líder: ${e.liderancaNome || 'Sem liderança'}`;
+  if (nomeEl) nomeEl.innerHTML = `📷 Documento / Foto — <span style="color:var(--gold-400);">${e.nome}</span>`;
+  if (subEl) subEl.textContent = `${e.bairroNome} • Líder: ${e.liderancaNome || 'Sem liderança'}`;
 
   if (imgEl) {
     if (e.fotoTitulo && e.fotoTitulo.trim() !== "") {
       imgEl.src = e.fotoTitulo;
       imgEl.style.display = "block";
     } else {
-      const mockSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="500" height="320" viewBox="0 0 500 320"><rect width="500" height="320" rx="14" fill="%23064e3b"/><rect x="12" y="12" width="476" height="296" rx="10" fill="%2303140c" stroke="%2310b981" stroke-width="2"/><text x="250" y="45" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23fbbf24" text-anchor="middle">JUSTIÇA ELEITORAL — REPÚBLICA FEDERATIVA DO BRASIL</text><text x="250" y="68" font-family="sans-serif" font-size="12" fill="%23a7f3d0" text-anchor="middle">TÍTULO ELEITORAL • 8ª ZONA ELEITORAL — RIACHUELO/RN</text><line x1="30" y1="80" x2="470" y2="80" stroke="%23059669" stroke-width="1"/><text x="40" y="105" font-family="sans-serif" font-size="11" fill="%2394a3b8">NÚMERO DO TÍTULO</text><text x="40" y="128" font-family="monospace" font-size="16" font-weight="bold" fill="%23fbbf24">${titFormatado}</text><text x="40" y="155" font-family="sans-serif" font-size="11" fill="%2394a3b8">NOME DO ELEITOR</text><text x="40" y="178" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23ffffff">${encodeURIComponent(e.nome)}</text><text x="40" y="210" font-family="sans-serif" font-size="11" fill="%2394a3b8">ENDEREÇO / BAIRRO</text><text x="40" y="230" font-family="sans-serif" font-size="13" fill="%23e2e8f0">${encodeURIComponent(e.rua || '')}, ${encodeURIComponent(e.numero || 'S/N')} — ${encodeURIComponent(e.bairroNome || '')}</text><text x="40" y="265" font-family="sans-serif" font-size="11" fill="%2394a3b8">SEÇÃO</text><text x="40" y="292" font-family="monospace" font-size="20" font-weight="bold" fill="%23fbbf24">${e.secao}</text><text x="160" y="265" font-family="sans-serif" font-size="11" fill="%2394a3b8">ZONA</text><text x="160" y="292" font-family="monospace" font-size="20" font-weight="bold" fill="%2310b981">008</text><text x="260" y="265" font-family="sans-serif" font-size="11" fill="%2394a3b8">LIDERANÇA EXCLUSIVA</text><text x="260" y="290" font-family="sans-serif" font-size="12" font-weight="bold" fill="%2338bdf8">${encodeURIComponent(e.liderancaNome || 'Sem liderança')}</text></svg>`;
+      const mockSvg = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="500" height="320" viewBox="0 0 500 320"><rect width="500" height="320" rx="14" fill="%23064e3b"/><rect x="12" y="12" width="476" height="296" rx="10" fill="%2303140c" stroke="%2310b981" stroke-width="2"/><text x="250" y="45" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23fbbf24" text-anchor="middle">RADAR DE GESTÃO — FICHA DO ELEITOR</text><text x="250" y="68" font-family="sans-serif" font-size="12" fill="%23a7f3d0" text-anchor="middle">CADASTRO TERRITORIAL — RIACHUELO/RN</text><line x1="30" y1="80" x2="470" y2="80" stroke="%23059669" stroke-width="1"/><text x="40" y="115" font-family="sans-serif" font-size="11" fill="%2394a3b8">NOME DO ELEITOR</text><text x="40" y="138" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23ffffff">${encodeURIComponent(e.nome)}</text><text x="40" y="175" font-family="sans-serif" font-size="11" fill="%2394a3b8">ENDEREÇO / BAIRRO</text><text x="40" y="195" font-family="sans-serif" font-size="13" fill="%23e2e8f0">${encodeURIComponent(e.rua || '')}, ${encodeURIComponent(e.numero || 'S/N')} — ${encodeURIComponent(e.bairroNome || '')}</text><text x="40" y="235" font-family="sans-serif" font-size="11" fill="%2394a3b8">INTENÇÃO PREFEITO</text><text x="40" y="258" font-family="sans-serif" font-size="14" font-weight="bold" fill="%2310b981">${encodeURIComponent(e.intencaoPrefeito || 'Não informado')}</text><text x="260" y="235" font-family="sans-serif" font-size="11" fill="%2394a3b8">INTENÇÃO VEREADOR</text><text x="260" y="258" font-family="sans-serif" font-size="14" font-weight="bold" fill="%23fbbf24">${encodeURIComponent(e.intencaoVereador || 'Não informado')}</text><text x="40" y="285" font-family="sans-serif" font-size="11" fill="%2394a3b8">LIDERANÇA EXCLUSIVA:</text><text x="180" y="285" font-family="sans-serif" font-size="12" font-weight="bold" fill="%2338bdf8">${encodeURIComponent(e.liderancaNome || 'Sem liderança')}</text></svg>`;
       imgEl.src = mockSvg;
       imgEl.style.display = "block";
     }
@@ -3126,8 +3129,12 @@ function abrirFotoTituloModal(id) {
           <strong style="color:#ffffff;">${e.nome}</strong>
         </div>
         <div>
-          <span style="color:var(--text-muted); font-size:0.75rem;">Número do Título:</span><br>
-          <strong style="color:var(--gold-400); font-family:var(--font-mono);">${titFormatado}</strong>
+          <span style="color:var(--text-muted); font-size:0.75rem;">Intenção p/ Prefeito:</span><br>
+          <strong style="color:var(--emerald-400);">${e.intencaoPrefeito || 'Não informado'}</strong>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.75rem;">Intenção p/ Vereador:</span><br>
+          <strong style="color:var(--gold-400);">${e.intencaoVereador || 'Não informado'}</strong>
         </div>
         <div>
           <span style="color:var(--text-muted); font-size:0.75rem;">Bairro / Comunidade:</span><br>
@@ -3140,10 +3147,6 @@ function abrirFotoTituloModal(id) {
         <div>
           <span style="color:var(--text-muted); font-size:0.75rem;">Telefone / WhatsApp:</span><br>
           <strong style="color:#ffffff;">${e.telefone || 'Não informado'}</strong>
-        </div>
-        <div>
-          <span style="color:var(--text-muted); font-size:0.75rem;">Seção Eleitoral:</span><br>
-          <strong style="color:var(--gold-400);">Seção ${e.secao || '-'} (8ª Zona)</strong>
         </div>
         <div style="grid-column: 1 / -1;">
           <span style="color:var(--text-muted); font-size:0.75rem;">Endereço Completo:</span><br>
@@ -3164,10 +3167,10 @@ function exportarEleitoresCSV() {
     return;
   }
 
-  let csv = "Nome;NumeroTitulo;Rua;Numero;EnderecoCompleto;Bairro;Secao;LiderancaExclusiva;Telefone;DataCadastro;TemFotoTitulo;Observacoes\n";
+  let csv = "Nome;IntencaoPrefeito;IntencaoVereador;Rua;Numero;EnderecoCompleto;Bairro;LiderancaExclusiva;Telefone;DataCadastro;TemFoto;Observacoes\n";
   lista.forEach(e => {
     const temFoto = e.fotoTitulo && e.fotoTitulo.trim() !== "" ? "SIM" : "NAO";
-    csv += `"${e.nome || ''}";"${e.numeroTitulo || ''}";"${e.rua || ''}";"${e.numero || ''}";"${e.endereco || ''}";"${e.bairroNome || ''}";"${e.secao || ''}";"${e.liderancaNome || ''}";"${e.telefone || ''}";"${e.dataCadastro || ''}";"${temFoto}";"${(e.observacoes || '').replace(/"/g, '""')}"\n`;
+    csv += `"${e.nome || ''}";"${e.intencaoPrefeito || ''}";"${e.intencaoVereador || ''}";"${e.rua || ''}";"${e.numero || ''}";"${e.endereco || ''}";"${e.bairroNome || ''}";"${e.liderancaNome || ''}";"${e.telefone || ''}";"${e.dataCadastro || ''}";"${temFoto}";"${(e.observacoes || '').replace(/"/g, '""')}"\n`;
   });
 
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -5658,7 +5661,7 @@ function abrirTelaLoginComUsuarioPreenchido(loginPreenchido) {
 function fecharTelaLogin() {
   const isAuth = sessionStorage.getItem("RADAR_BACURAU_AUTH_ACTIVE") === "true";
   if (!isAuth) {
-    showToast("🔒 Acesso restrito: informe seu login e sua senha para entrar no Radar Bacurau.");
+    showToast("🔒 Acesso restrito: informe seu login e sua senha para entrar no Radar de Gestão.");
     return;
   }
   const overlay = document.getElementById("authScreenOverlay");
@@ -5728,7 +5731,7 @@ async function executarLogin(event) {
         SupabaseClient.sincronizarTudo();
       }
 
-      showToast(`Bem-vindo(a) ao Radar Bacurau, ${user.nome}!`);
+      showToast(`Bem-vindo(a) ao Radar de Gestão, ${user.nome}!`);
 
       if (user.perfil === "LIDERANÇA COMUNITÁRIA") {
         navigateTo("eleitores");

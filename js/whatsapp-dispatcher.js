@@ -665,7 +665,7 @@ function dispararWhatsAppEleitor(eleitorId) {
   }
 
   // Se tiver um template padrão, usa o de Seção
-  const template = WhatsAppDispatcher.getTemplates()[0]?.texto || "Olá {primeiro_nome}, aqui é da equipe do Radar Bacurau!";
+  const template = WhatsAppDispatcher.getTemplates()[0]?.texto || "Olá {primeiro_nome}, aqui é da equipe do Radar de Gestão!";
   const msg = WhatsAppDispatcher.processarMensagem(template, eleitor);
   const url = `https://api.whatsapp.com/send?phone=${fone}&text=${encodeURIComponent(msg)}`;
 
