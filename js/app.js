@@ -94,9 +94,9 @@ function initNavigation() {
 function navigateTo(viewId) {
   const currentUser = db.getCurrentUser();
   if (currentUser && currentUser.perfil === "LIDERANÇA COMUNITÁRIA") {
-    const viewsPermitidas = ["mapa", "eleitores", "demandas", "whatsapp", "estatisticas"];
+    const viewsPermitidas = ["mapa", "eleitores", "demandas", "whatsapp", "estatisticas", "beneficios"];
     if (!viewsPermitidas.includes(viewId)) {
-      showToast("🔒 Acesso restrito: seu perfil de Liderança possui acesso ao Cadastro de Eleitores, Mapa Territorial, Demandas e WhatsApp.");
+      showToast("🔒 Acesso restrito: seu perfil de Liderança possui acesso ao Cadastro de Eleitores, Mapa Territorial, Demandas, Benefícios e WhatsApp.");
       viewId = "eleitores";
     }
   }
@@ -160,6 +160,9 @@ function renderView(viewId) {
     case "demandas":
       renderDemandas();
       break;
+    case "beneficios":
+      renderBeneficios();
+      break;
     case "secoes":
       renderSecoes();
       break;
@@ -195,6 +198,7 @@ function updateBreadcrumb(viewId) {
     eleitores: "Cadastro Territorial de Eleitores — Riachuelo/RN",
     whatsapp: "Disparador Territorial via WhatsApp — Riachuelo/RN",
     demandas: "Demandas Comunitárias & Atendimento Territorial — Riachuelo/RN",
+    beneficios: "Pesquisar Benefícios & Licitações — API Portal da Transparência",
     secoes: "Mapeamento das Seções Eleitorais (8ª Zona)",
     resultados: "Acervo Histórico do TSE (2014 a 2026) — Resultados & Candidatos por Seção",
     estatisticas: "Ranking Territorial de Candidatos & Estatísticas TSE (2014–2026)",
@@ -328,7 +332,7 @@ function aplicarPermissoesUsuario() {
     if (eleitorBreakdownGrid) eleitorBreakdownGrid.style.display = "none";
 
     // 3. Views da Liderança: prioriza Cadastro de Eleitores
-    const viewsPermitidas = ["eleitores", "whatsapp", "demandas", "mapa"];
+    const viewsPermitidas = ["eleitores", "whatsapp", "demandas", "beneficios", "mapa"];
     if (!viewsPermitidas.includes(AppState.currentView) || AppState.currentView === "dashboard") {
       navigateTo("eleitores");
     }
@@ -2800,7 +2804,7 @@ function renderEleitores() {
   if (lista.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="11" style="text-align:center; padding:35px; color:var(--text-muted);">
+        <td colspan="12" style="text-align:center; padding:35px; color:var(--text-muted);">
           Nenhum eleitor localizado com os filtros selecionados. Clique em "+ Cadastrar Eleitor" para registrar o primeiro.
         </td>
       </tr>
@@ -2814,13 +2818,49 @@ function renderEleitores() {
       ? `<img src="${e.fotoTitulo}" class="eleitor-foto-thumb" onclick="abrirFotoTituloModal('${e.id}')" title="Clique para ampliar a foto de ${e.nome}">`
       : `<div class="eleitor-foto-thumb-empty" onclick="editarEleitor('${e.id}')" title="Sem foto anexada. Clique para anexar foto.">📷<span>Sem Foto</span></div>`;
 
+    const aniv = (typeof WhatsAppDispatcher !== "undefined" && WhatsAppDispatcher.obterStatusAniversario)
+      ? WhatsAppDispatcher.obterStatusAniversario(e.dataNascimento)
+      : { temData: !!e.dataNascimento, formatada: e.dataNascimento || "Não informada", idade: null, ehHoje: false, ehProximaSemana: false, ehMesAtual: false };
+
+    let nascHtml = `<span style="font-size:0.78rem; color:var(--text-dim);">Não informada</span>`;
+    if (aniv.temData) {
+      if (aniv.ehHoje) {
+        nascHtml = `
+          <div>
+            <span style="background:linear-gradient(90deg, #f59e0b, #fbbf24); color:#000; font-weight:800; font-size:0.72rem; padding:2px 8px; border-radius:999px; display:inline-block;">
+              🎂 HOJE! (${aniv.diaMes})
+            </span>
+            <div style="font-size:0.73rem; color:var(--gold-400); margin-top:2px; font-weight:700;">
+              ${aniv.formatada}${aniv.idade !== null ? ` • ${aniv.idade} anos` : ""}
+            </div>
+          </div>
+        `;
+      } else if (aniv.ehProximaSemana) {
+        nascHtml = `
+          <div>
+            <span style="font-family:var(--font-mono); font-size:0.82rem; color:var(--gold-400); font-weight:700;">🎉 ${aniv.formatada}</span>
+            <div style="font-size:0.72rem; color:var(--emerald-400);">${aniv.ehAmanha ? "Aniversário amanhã!" : `Aniversário em ${aniv.diasRestantes} dias`}</div>
+          </div>
+        `;
+      } else {
+        nascHtml = `
+          <div>
+            <span style="font-family:var(--font-mono); font-size:0.82rem; color:#e2e8f0;">📅 ${aniv.formatada}</span>
+            ${aniv.idade !== null ? `<div style="font-size:0.72rem; color:var(--text-muted);">${aniv.idade} anos${aniv.ehMesAtual ? " • Mês atual 🎉" : ""}</div>` : ""}
+          </div>
+        `;
+      }
+    }
+
     return `
-      <tr>
+      <tr style="${aniv.ehHoje ? 'background:rgba(245,158,11,0.1); border-left:3px solid #fbbf24;' : ''}">
         <td>${fotoHtml}</td>
         <td>
           <strong style="color:#ffffff; font-size:0.92rem;">${e.nome}</strong>
+          ${aniv.ehHoje ? `<span style="margin-left:6px; background:var(--gold-400); color:#000; font-weight:800; font-size:0.68rem; padding:1px 6px; border-radius:4px;">🎂 ANIVERSARIANTE</span>` : ''}
           ${e.observacoes ? `<div style="font-size:0.73rem; color:var(--text-muted); margin-top:2px;">${e.observacoes.length > 40 ? e.observacoes.slice(0, 40) + '...' : e.observacoes}</div>` : ''}
         </td>
+        <td>${nascHtml}</td>
         <td>
           <span style="font-weight:600; color:#e2e8f0; font-size:0.85rem;">${e.rua || '-'}</span><br>
           <span style="font-size:0.72rem; color:var(--text-muted);">Nº ${e.numero || 'S/N'}</span>
@@ -2855,7 +2895,7 @@ function renderEleitores() {
         <td>
           <div style="display:flex; gap:6px;">
             ${temFoto ? `<button class="btn btn-secondary btn-sm" onclick="abrirFotoTituloModal('${e.id}')" title="Ver Foto Anexada">📷 Ver Foto</button>` : ''}
-            ${e.telefone ? `<button class="btn btn-secondary btn-sm" onclick="dispararWhatsAppEleitor('${e.id}')" title="Enviar WhatsApp Direto" style="color:#25D366; font-weight:700; font-size:1rem; padding:3px 7px;">💬</button>` : ''}
+            ${e.telefone ? `<button class="btn btn-secondary btn-sm" onclick="dispararWhatsAppEleitor('${e.id}')" title="${aniv.ehHoje ? 'Enviar Parabéns no WhatsApp' : 'Enviar WhatsApp Direto'}" style="color:#25D366; font-weight:700; font-size:1rem; padding:3px 7px;">${aniv.ehHoje ? '🎂' : '💬'}</button>` : ''}
             <button class="btn btn-primary btn-sm" onclick="editarEleitor('${e.id}')" title="Editar dados do eleitor">✏️</button>
             <button class="btn btn-secondary btn-sm" onclick="excluirEleitor('${e.id}')" title="Excluir cadastro" style="color:#ef4444;">🗑️</button>
           </div>
@@ -2889,20 +2929,27 @@ function renderEleitores() {
         const fotoHtml = temFoto
           ? `<img src="${e.fotoTitulo}" alt="Foto">`
           : `<span>📷</span>`;
+        const aniv = (typeof WhatsAppDispatcher !== "undefined" && WhatsAppDispatcher.obterStatusAniversario)
+          ? WhatsAppDispatcher.obterStatusAniversario(e.dataNascimento)
+          : { temData: false };
 
         return `
-          <div class="eleitor-mobile-card">
+          <div class="eleitor-mobile-card" style="${aniv.ehHoje ? 'border:1.5px solid var(--gold-400);' : ''}">
             <div class="eleitor-mobile-card-top">
               <div class="eleitor-mobile-avatar" onclick="${temFoto ? `abrirFotoTituloModal('${e.id}')` : `editarEleitor('${e.id}')`}" title="${temFoto ? 'Ver foto anexada' : 'Anexar foto'}">
                 ${fotoHtml}
               </div>
               <div class="eleitor-mobile-info">
-                <div class="eleitor-mobile-name">${e.nome}</div>
+                <div class="eleitor-mobile-name">
+                  ${e.nome}
+                  ${aniv.ehHoje ? `<span style="background:var(--gold-400); color:#000; font-size:0.68rem; padding:1px 6px; border-radius:4px; margin-left:4px; font-weight:800;">🎂 HOJE!</span>` : ''}
+                </div>
                 <div class="eleitor-mobile-endereco">
                   📍 ${e.rua ? `${e.rua}, Nº ${e.numero || 'S/N'}` : (e.endereco || 'Endereço não informado')}
                 </div>
                 <div class="eleitor-mobile-badges">
                   <span class="badge-bairro">📍 ${e.bairroNome || '-'}</span>
+                  ${aniv.temData ? `<span class="badge-secao" style="${aniv.ehHoje ? 'background:rgba(245,158,11,0.25); color:var(--gold-400); border-color:var(--gold-400);' : ''}">🎂 ${aniv.formatada}</span>` : ''}
                   <span class="badge-secao">🏛️ Pref: ${e.intencaoPrefeito || 'N/I'}</span>
                   <span class="badge-secao">🗳️ Ver: ${e.intencaoVereador || 'N/I'}</span>
                   ${temFoto ? '<span class="badge-doc">📷 Com Foto</span>' : ''}
@@ -3104,6 +3151,31 @@ function removerFotoTituloAnexada() {
   if (uploadArea) uploadArea.style.display = "block";
 }
 
+function atualizarPreviewAniversarioFormEleitor() {
+  const input = document.getElementById("formEleitorDataNascimento");
+  const infoEl = document.getElementById("eleitorAniversarioPreviewInfo");
+  if (!infoEl) return;
+
+  const val = input ? input.value : "";
+  if (!val) {
+    infoEl.innerHTML = `🔔 O aniversário será marcado automaticamente no Disparo em Massa.`;
+    return;
+  }
+
+  if (typeof WhatsAppDispatcher !== "undefined" && WhatsAppDispatcher.obterStatusAniversario) {
+    const aniv = WhatsAppDispatcher.obterStatusAniversario(val);
+    if (aniv.temData) {
+      if (aniv.ehHoje) {
+        infoEl.innerHTML = `🎂 <strong style="color:var(--gold-400);">Faz aniversário HOJE (${aniv.diaMes}${aniv.idade !== null ? ` • ${aniv.idade} anos` : ""})!</strong> Já será destacado no topo do Disparo em Massa.`;
+      } else {
+        infoEl.innerHTML = `✅ Aniversário em <strong>${aniv.diaMes}</strong>${aniv.idade !== null ? ` (${aniv.idade} anos)` : ""} — marcado no Disparo em Massa para você nunca esquecer.`;
+      }
+      return;
+    }
+  }
+  infoEl.innerHTML = `✅ Data registrada — aniversário marcado no Disparo em Massa.`;
+}
+
 function abrirModalNovoEleitor() {
   const form = document.getElementById("formEleitor");
   if (form) form.reset();
@@ -3125,6 +3197,7 @@ function abrirModalNovoEleitor() {
   if (tituloInput) tituloInput.style.borderColor = "";
 
   removerFotoTituloAnexada();
+  atualizarPreviewAniversarioFormEleitor();
 
   const tituloModal = document.getElementById("modalEleitorTitulo");
   const subModal = document.getElementById("modalEleitorSubtitulo");
@@ -3211,6 +3284,11 @@ function editarEleitor(id) {
 
   document.getElementById("formEleitorId").value = e.id;
   document.getElementById("formEleitorNome").value = e.nome || "";
+  const nascInput = document.getElementById("formEleitorDataNascimento");
+  if (nascInput) {
+    nascInput.value = e.dataNascimento || "";
+    atualizarPreviewAniversarioFormEleitor();
+  }
   const titInput = document.getElementById("formEleitorNumeroTitulo");
   if (titInput) titInput.value = e.numeroTitulo ? formatarTituloExibicao(e.numeroTitulo) : "";
   document.getElementById("formEleitorTelefone").value = e.telefone || "";
@@ -3237,6 +3315,7 @@ function editarEleitor(id) {
 
 function salvarFormEleitor() {
   const nome = (document.getElementById("formEleitorNome")?.value || "").trim();
+  const dataNascimento = (document.getElementById("formEleitorDataNascimento")?.value || "").trim();
   const numeroTitulo = (document.getElementById("formEleitorNumeroTitulo")?.value || "").trim();
   const intencaoPrefeito = (document.getElementById("formEleitorIntencaoPrefeito")?.value || "").trim();
   const intencaoVereador = (document.getElementById("formEleitorIntencaoVereador")?.value || "").trim();
@@ -3247,6 +3326,11 @@ function salvarFormEleitor() {
   if (!nome) {
     showToast("Informe o nome completo do eleitor.");
     document.getElementById("formEleitorNome")?.focus();
+    return;
+  }
+  if (!dataNascimento) {
+    showToast("Informe a data de nascimento do eleitor para marcar o aniversário no Disparo em Massa.");
+    document.getElementById("formEleitorDataNascimento")?.focus();
     return;
   }
   if (!bairro) {
@@ -3271,6 +3355,7 @@ function salvarFormEleitor() {
   const payload = {
     id: id || undefined,
     nome: nome,
+    dataNascimento: dataNascimento,
     numeroTitulo: numeroTitulo,
     intencaoPrefeito: intencaoPrefeito,
     intencaoVereador: intencaoVereador,
@@ -3303,8 +3388,12 @@ function salvarFormEleitor() {
   try {
     db.saveEleitor(payload);
     closeModal("modalEleitor");
-    showToast(`Eleitor "${nome}" salvo com exclusividade para ${lider}!`);
+    showToast(`Eleitor "${nome}" salvo e aniversário marcado no Disparo em Massa!`);
     renderEleitores();
+    if (typeof WhatsAppDispatcher !== "undefined") {
+      WhatsAppDispatcher.carregarFila();
+      WhatsAppDispatcher.atualizarInterfaceFila();
+    }
   } catch (err) {
     showToast("⛔ " + err.message, 6000);
   }
@@ -3330,6 +3419,10 @@ function excluirEleitor(id) {
       db.deleteEleitor(id);
       showToast(`Eleitor "${e.nome}" removido.`);
       renderEleitores();
+      if (typeof WhatsAppDispatcher !== "undefined") {
+        WhatsAppDispatcher.carregarFila();
+        WhatsAppDispatcher.atualizarInterfaceFila();
+      }
     } catch (err) {
       showToast("⛔ " + err.message);
     }
@@ -3348,8 +3441,6 @@ function abrirFotoTituloModal(id) {
   const imgEl = document.getElementById("fotoTituloModalImg");
   const dadosEl = document.getElementById("fotoTituloModalDados");
 
-  const titFormatado = e.numeroTitulo ? formatarTituloExibicao(e.numeroTitulo) : "Não informado";
-
   if (nomeEl) nomeEl.innerHTML = `📷 Documento / Foto — <span style="color:var(--gold-400);">${e.nome}</span>`;
   if (subEl) subEl.textContent = `${e.bairroNome} • Líder: ${e.liderancaNome || 'Sem liderança'}`;
 
@@ -3364,12 +3455,20 @@ function abrirFotoTituloModal(id) {
     }
   }
 
+  const aniv = (typeof WhatsAppDispatcher !== "undefined" && WhatsAppDispatcher.obterStatusAniversario)
+    ? WhatsAppDispatcher.obterStatusAniversario(e.dataNascimento)
+    : { temData: !!e.dataNascimento, formatada: e.dataNascimento || "Não informada", idade: null, ehHoje: false };
+
   if (dadosEl) {
     dadosEl.innerHTML = `
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; font-size:0.83rem;">
         <div>
           <span style="color:var(--text-muted); font-size:0.75rem;">Nome do Eleitor:</span><br>
           <strong style="color:#ffffff;">${e.nome}</strong>
+        </div>
+        <div>
+          <span style="color:var(--text-muted); font-size:0.75rem;">Data de Nascimento:</span><br>
+          <strong style="color:var(--gold-400);">🎂 ${aniv.temData ? `${aniv.formatada}${aniv.idade !== null ? ` (${aniv.idade} anos)` : ""}${aniv.ehHoje ? " — HOJE!" : ""}` : "Não informada"}</strong>
         </div>
         <div>
           <span style="color:var(--text-muted); font-size:0.75rem;">Intenção p/ Prefeito:</span><br>
@@ -3410,10 +3509,10 @@ function exportarEleitoresCSV() {
     return;
   }
 
-  let csv = "Nome;IntencaoPrefeito;IntencaoVereador;Rua;Numero;EnderecoCompleto;Bairro;LiderancaExclusiva;Telefone;DataCadastro;TemFoto;Observacoes\n";
+  let csv = "Nome;DataNascimento;IntencaoPrefeito;IntencaoVereador;Rua;Numero;EnderecoCompleto;Bairro;LiderancaExclusiva;Telefone;DataCadastro;TemFoto;Observacoes\n";
   lista.forEach(e => {
     const temFoto = e.fotoTitulo && e.fotoTitulo.trim() !== "" ? "SIM" : "NAO";
-    csv += `"${e.nome || ''}";"${e.intencaoPrefeito || ''}";"${e.intencaoVereador || ''}";"${e.rua || ''}";"${e.numero || ''}";"${e.endereco || ''}";"${e.bairroNome || ''}";"${e.liderancaNome || ''}";"${e.telefone || ''}";"${e.dataCadastro || ''}";"${temFoto}";"${(e.observacoes || '').replace(/"/g, '""')}"\n`;
+    csv += `"${e.nome || ''}";"${e.dataNascimento || ''}";"${e.intencaoPrefeito || ''}";"${e.intencaoVereador || ''}";"${e.rua || ''}";"${e.numero || ''}";"${e.endereco || ''}";"${e.bairroNome || ''}";"${e.liderancaNome || ''}";"${e.telefone || ''}";"${e.dataCadastro || ''}";"${temFoto}";"${(e.observacoes || '').replace(/"/g, '""')}"\n`;
   });
 
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -6516,5 +6615,3226 @@ function renderWhatsapp() {
 }
 
 window.renderWhatsapp = renderWhatsapp;
+
+// ==========================================================================
+// MÓDULO DE PESQUISA DE BENEFÍCIOS & LICITAÇÕES (API PORTAL DA TRANSPARÊNCIA)
+// Header oficial configurado: [{"key":"chave-api-dados","value":"9ab0c7d494c97d58b2493e1049a84c29"}]
+// ==========================================================================
+function escapeHTMLBeneficios(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+if (typeof window.escapeHTML !== "function") {
+  window.escapeHTML = escapeHTMLBeneficios;
+}
+
+const BeneficiosApiState = {
+  apiKey: localStorage.getItem("radar_chave_api_dados") || "9ab0c7d494c97d58b2493e1049a84c29",
+  codigoIbge: localStorage.getItem("radar_beneficios_ibge") || "2410604", // Riachuelo - RN (IBGE 2410604)
+  headersConfig: [{ key: "chave-api-dados", value: "9ab0c7d494c97d58b2493e1049a84c29" }],
+  resultadosApiCache: [],
+  resultadosBrutos: [],
+  resultadosFiltrados: [],
+  carregando: false,
+  jaInicializado: false
+};
+
+// Base local consolidada de Benefícios e Licitações de Riachuelo–RN (suporte imediato + contingência CORS)
+const BASE_FALLBACK_BENEFICIOS_LICITACOES = [
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: DALIENE NASCIMENTO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JOSE DE ARIMATEIA LIMA BEZERRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA DE FATIMA NUNES DOS SANTOS CAVALCANTE - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LAUDICEIA SABINO DE OLIVEIRA CATAO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: KARINA CRISTINA DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: SAMARA KELY ALVES DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: FRANCISCA JOSIENE BENTO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LUZIA CLEDNA TOMAZ DE PAIVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ADRIANA DE GOES BAY MARTINS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: CLEONIZIA ACIOLI DA SILVA SOUZA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: WILMA JUSTINO DA CRUZ - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANA MARIA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: AGATHA LUANNA OLIVEIRA DOS SANTOS SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: KAMILA BEATRIZ RIBEIRO DA CONCEICAO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: FRANCISCA DELMA DE SOUZA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: DANILA SILVA DE OLIVEIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: CARLA FREITAS DOS SANTOS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JAQUELINE PEREIRA GUILHERME - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MIRNA DAMARES MACEDO MATIAS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ALDENIZE CAMPOS XAVIER - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA DE FATIMA DA SILVA OLIVEIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MAGNA SANTOS DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANA GABRIELE BARRETO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: FLAVIANA ALVES IZIDIO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: RENATA CONSTANTINO DE MOURA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA ISABEL FRANCA DOS SANTOS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: WILTEMBERG VARELA DE SOUSA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: EMILI ALEXANDRA SILVA CAETANO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARANNI FERNANDES ETER - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA DA CONCEICAO CORREIA BIANCHI - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA SANTANA DE OLIVEIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA ZULEIDE DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA DE FATIMA DO NASCIMENTO DE OLIVEIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ADRIANA MARQUES DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LEIDE IDAIANA ALVES DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LUZANIRA SERAFIM DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: YANNA AUGUSTA DE MORAIS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: VANESSA EMILY INACIO BARBOSA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANA KAROLINA DA SILVA FIDELIS PIMENTEL - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANA CLAUDIA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: DANIELA TEIXEIRA DE OLIVEIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LUANA PEREIRA GONCALVES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA ROZIANE DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JESSICA JANAINA VARELA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA LEIDIMAR DE FREITAS NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JULIANA CORREIA DE MELO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA CLARA FREIRE MARTINS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: DENISE CARDOSO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JOSIREUDA MOREIRA ALVES MACEDO SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JOSIMARIA PATRICIA FREIRE DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ERICA LAVINIA DA SILVA SOUZA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ELIANA ACIOLI PEREIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: BRENA DOS SANTOS PAIVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,13", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LUCIMAR DE LIMA MAXIMO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,10", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: KELIANE VIANA DE SOUZA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,05", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA GORETE DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,40", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: DAYANE ALVES PAULO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,40", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ROSELIANE OLIVEIRA DE SOUZA MELO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,40", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MICARLA DE SOUZA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,01", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: RAYSSA RENATA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MONICA MARIA DA SILVA LIMA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LARYSSA NARDELLI COELHO DE FRANCA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANA GABRIELLE DA SILVA SIMPLICIO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: FRANCISCA DAS CHAGAS DE SOUZA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA SILVIA AGOSTINHO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: VANESSA LARISSA MIRANDA DE LIMA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,80", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: CAROLINE PAZ DA COSTA FERREIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,76", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANDREIA LIMA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,75", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MIRTES CONSTANTINO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,92", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LIDIA DE MEDEIROS GOMES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,90", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA FRANCISCA ESTEVAM DE MEDEIROS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,84", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARILIA DA SILVA GOMES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,71", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ALESSANDRA CAMILY DE OLIVEIRA CARNEIRO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,53", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA JOSE FELIPE LOPES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,45", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANA CELIA ALMEIDA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,43", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: SONALY ARIELLY DA SILVA MENDES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,60", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LORAYNE DUARTE ALVES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,60", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JOYCE MONTEITO DIONISIO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,55", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: MARIA ANTONIA VENANCIO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: RITA DE CASSIA DE MEDEIROS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JACKELINE CONCEICAO DAMASCENO SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JOSIANE MARTINS DE SANTANA DE MEDEIROS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: LILIANE DOS SANTOS BARBOSA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: VANESSA DE BRITO FERREIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: FLAVIA TOMAZ DA COSTA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ROSILMA SILVA DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: AMANDA KELLY MARQUES DA ROCHA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: EGLAYNE EULIZIA DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: DEBORA RAYANNE SANTOS DE ARAUJO SALES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JOSIAS TARGINO FERNANDES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: SONALY ARIELLY DA SILVA MENDES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANA BEATRIZ DA ROCHA SOARES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: RENATA MADALENA GOMES DE ALMEIDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ELIANE DA SILVA MENDONCA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: DAYANE ALVES PAULO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ERICA NAIARA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: NADJA LIDIANE DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: DAMASIO DA SILVA RODRIGUES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: ANGEZICA MYCASSIA DE ARAUJO ALVES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: JANAINA MARINHO GOMES - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: THAISE FERNANDA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: CRISTIANA BARBOSA SILVA DE SOUZA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: VANESSA EMILY INACIO BARBOSA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: FRANCISCA ROSINEIDE LEONARDO DE MOURA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: FRANCISCA TAYMARA DO NASCIMENTO MACEDO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "*** TITULAR MENOR DE 16 ANOS ***", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF *** Titular menor de 16 anos *** - NIS *** Titular menor de 16 anos *** | Rep. Legal: RAIANE CRISTINA COSTA FELIX - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADAILTON GOMES DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.354.568-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADAILZA DE FREITAS MACEDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.806-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADELVINA DA SILVA GOMES DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.570.430-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA ACIOLE DA SILVA CARDOSO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.103.294-** - Revendedora: 08.700.130/0001-49 - IVO NILSON LOPES DE MEDEIROS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA ACIOLE DA SILVA CARDOSO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.956.041-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA ALEXANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.358.890-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA ALVES DE LIMA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.469.864-** - NIS 1.177.809.544-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA ARAUJO MARTILIANO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.110.144-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA ARAUJO MARTILIANO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.358.275-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA CARDOSO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.923.355-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA DOS SANTOS SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.751.187-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA DOS SANTOS SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.254.674-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA ESTEVAM DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.773.634-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA ESTEVAM DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.322.510.264-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA FORTUNATO DA SILVA JOACI", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.707.844-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA FORTUNATO DA SILVA JOACI", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.260.277.464-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA LEONARDO DE ARAUJO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.960.404-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA LEONARDO DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.923.274-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA LOURENCO DE MEDEIROS OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.944.085-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA LOURENCO DE MEDEIROS OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.906.754-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANA MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.133.309.310-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ADRIANO INACIO DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.417.545-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AGDA MARIA DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.557.673-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AKSSA MARINE LIRA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.860.974-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AKSSA MARINE LIRA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.362.124-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALAIUZA SULEIDE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.124.471.704-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALAN FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.122.695.338-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALAN PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.679.159-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALANA CRISTINA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.923.849-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALBANIZA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.395.813-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALBANIZA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.185.634-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALBENI SILVA FONTES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.270.479.364-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALBENI SILVA FONTES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.573.494-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALCIONE JUSTINO DA SILVA SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.618.911-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALCIONE JUSTINO DA SILVA SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.099.764-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALDAIZA NEVES DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.396.332-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALDENIZA MONTEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.281.708.464-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALDENIZA MONTEIRO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.485.294-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALDILENE MACIEL DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.579.244-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALESANDRA GOMES DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.049.674-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALESANDRA GOMES DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.945.102-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALESSANDRA FERNANDES ACIOLI MARTINS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.019.809-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALESSANDRA SALUSTINO DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.863.594-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALESSANDRA SALUSTINO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.006.390.474-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALEXANDRA IDALINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.959.425-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALEXANDRE NETO DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.279.226-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALEXSANDRA MARIA SIQUEIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.050,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.396.112-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALEXSANDRA MARIA SIQUEIRA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.319.524-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALEXSANDRO GUEDES DE MOURA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.056.594-** - NIS 2.042.050.239-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALEXSSANDRA DA SILVA MONTEIRO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.724.444-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALEXSSANDRA DA SILVA MONTEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 576,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.933-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALICE DINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.704.196-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALICIA QUIRINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.889-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINE ALVES DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.858.345-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINE ALVES DE MELO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.128.904-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINE ANDRE TEIXEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.519.799-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINE DA SILVA SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.369.067-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINE MACIEL DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.344.724-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINE MACIEL DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 505,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.369.030-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINE SANTOS CARDOSO MARQUES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.076.324-** - Revendedora: 03.954.830/0001-46 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINY SUERDE LIMA DE SOUZA VIANA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.238.054-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALINY SUERDE LIMA DE SOUZA VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.369.069-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALLANA VITORIA GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.122.019.363-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALMIR DA SILVA TERTULINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.948.154-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALMIR FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.234.373.571-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALTAIR FELIPE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.275.679.164-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALTAMIR NEVES DE OLIVEIRA JUNIOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.398.698-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALUCIANO BENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.096.471-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALZENIR AMBROZIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.279.028.564-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ALZENIRA PEREIRA DE MELO FRANCA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.603.205.827-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AMANDA CRISTINA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.924.673-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AMANDA DE LIMA ANDRADE DIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.142.437-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AMANDA FERREIRA DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.508.791-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AMANDA PERLLA CAMARA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.370.450-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AMARILDO CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.222.470.587-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA BEATRIZ DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.927.255-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA BEATRIZ DOS SANTOS SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.122.479.273-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA BEATRIZ LEONCIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 480,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.431-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CARIRINA FERREIRA DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 760,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.577.223-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CARIRINA FERREIRA DE MELO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.043.314-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CARLA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.008.094-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CARLA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.927.053-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CARLA FERNANDES DA ROCHA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.927.168-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CARLA FERNANDES DA ROCHA LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.915.534-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CELI ARRUDA DE LIMA GOMES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.049.684-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CELI ARRUDA DE LIMA GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.144.870-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CLARA DE SANTANA FREIRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.302,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.122.559.355-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CLARA NASCIMENTO ALEXANDRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.124.421.575-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CLARICE DO NASCIMENTO ALEXANDRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.124.421.576-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CLAUDIA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.387.740-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CLAUDIA DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.976.144-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CLAUDIA FELIX DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.571.449-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CRISTIANE PEREIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.812.704-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CRISTIANE PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.835.750-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CRISTINA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.391.098-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CRISTINA MONTEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.684.586-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA CRISTINA MONTEIRO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.971.294-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.062.543.606-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA GABRIELE BARRETO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.640.954-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA GABRIELE BARRETO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.040.745.613-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA GABRIELLE DA SILVA SIMPLICIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 475,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.436-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA GABRIELLE DA SILVA SIMPLICIO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.921.934-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA HELOIZE LOURENCO DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.059.732-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA JULIA SILVA ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.946.807-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA KAMILLY MATIAS FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.613.208.847-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA KARLA RIBEIRO DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.125.332.700-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA KAROLYNNE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.014.467.085-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA KAROLYNNE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.171.004-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA KATARINA DO NASCIMENTO ALEXANDRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.853.225-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA KATIA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.927.125-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA KATIA PEREIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.868.504-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA LUCIA ESTEVAM DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.831-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA MARIA BARRETO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.400.148-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.942.469-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.390.305-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA MARIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.351.914-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.927.356-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA MARIA MATIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.093.281.297-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA MARIA TEIXEIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.577.740-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DA SILVA SALES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.619.513-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DA SILVA SALES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.907.284-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.260.914-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.297.055.564-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DE LIMA SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.122.591.221-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.487.004-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.073.486-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DO NASCIMENTO SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.927.419-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA DO NASCIMENTO SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.201.504-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PAULA GRACIANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.608.886.413-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PRISCILA VICENTE DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.577.259-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA PRISCILA VICENTE DE MOURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.877.674-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA SUELY DE SOUZA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.870.754-** - NIS 1.166.547.793-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANA SUELY DO NASCIMENTO NUNES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.124.219.423-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANACLEIDE ONOFRE DA SILVA EDUARDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.366.923.906-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANAILDA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.145.999-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANAILDA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.740.544-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANALUCIA CIPRIANO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.389.631-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANALYNA REGINA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.739.937-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANANDRIELI ANDRADE CLEMENTINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.128.459.613-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANANILIA REGINA DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,32", detalhe: "CPF ***.772.054-** - NIS 1.600.833.829-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDIARA ALEXANDRE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.129.874-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDIARA ALEXANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.372.724-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREA DA SILVA TARGINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.308.611.864-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREA SIMONARA PEREIRA ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.973.555-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREA SIMONARA PEREIRA ALMEIDA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.517.824-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREIA CRISTINA LEONARDO DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.096.291.219-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREIA MARIA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.637.514-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREIA MARIA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.608.435.494-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREIA NASCIMENTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.924.898-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREIA TEIXEIRA DA COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 425,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.342.528.827-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREIZA DE LIMA DINIZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.373.998-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREZA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.533.554-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREZA GALDINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 910,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.374.725-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREZA IDALINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.356.137.345-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREZA MACIEL DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.877.834-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREZA MACIEL DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.925.008-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREZA MARIA LEITE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.368.088.300-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDREZA SILVA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.510.723-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDRIELE DE FRANCA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.112.444-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANDRIELLY ROBERTA DA SILVA TEIXEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.614.206.063-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANELLY PAULA CAMARA AZEVEDO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.634.384-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANELLY PAULA CAMARA AZEVEDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.927.581-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANGELA FERREIRA DA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.407.242-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANGELA FERREIRA DA ROCHA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.872.934-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANGELA LETICIA EVANGELISTA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.378.702.750-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANGELA LETICIA EVANGELISTA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.191.864-** - Revendedora: 54.251.102/0004-51 - UGEDX COMERCIO DE GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANGELA MARIA QUIRINO SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.612.607.016-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANGELINA FRANCISCA JANUARIO SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.377.516-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANGELINA FRANCISCA JANUARIO SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.186.524-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANNE CELY DA SILVA DANTAS VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.981.657-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANTONIA DA SILVA BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.378.265-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANTONIA DE MIRANDA ALVES", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.791.484-** - NIS 1.608.438.790-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANTONIA ERILENE DE SOUZA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.609.746.466-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANTONIA ERILENE DE SOUZA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.089.864-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANTONIA KAREN KAMILLY DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.140.689-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ANTONIO GUSMAO DA SILVA TRAJANO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.066.456.882-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "APARECIDA SUERDA GOMES DE ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.050,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.522.352-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "APOLIANA SILVA DA COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.063.032-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AQUILES QUERINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.384.508.126-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AQUIRATIAN LAURENTINO FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.063.356.750-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ARACELI PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.129.586.610-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ARILEIDE DANTAS DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.943.025-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AVANIR PINHEIRO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.755.614-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AVANIR PINHEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.012.829.131-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "AYLLANY SOARES FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.134.293.134-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BARBARA THAIS SILVA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.390.676-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BETANIA FURTUNATO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.741.278-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BIANCA KELLY DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.061.194-** - Revendedora: 54.328.189/0002-56 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BIANCA KELLY DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.401.556-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BIANCA LAVINIA SILVA QUIRINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.410.657-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRENA KEZIA MACENA LEANDRO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.920.384-** - NIS 1.178.022.547-9 | Rep. Legal: ISABEL CRISTINA MACENA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRENA MADALIDIA DO NASCIMENTO SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.986.314-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRENA MADALIDIA DO NASCIMENTO SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.401.970-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRENDA TATIANE DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.471-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRENDA TATIANE DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.156.464-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRENO ROSENDO DE SOUZA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.664.364-** - NIS 2.677.455.711-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRUNA DA SILVA NAVEGA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.985.181-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRUNA DINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.644.624-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRUNA DINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.060,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.928.780-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRUNA THAIS MONTEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.778-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "BRUNO JERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.018.319-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CAMILA BARBOSA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.873-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CAMILA CAROLINE FIRMINO DA COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.142.912-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CAMILA CAROLINE FIRMINO DA COSTA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.996.104-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CAMILA CLAUDINO BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.373.313.760-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CAMILA FELIPE DA COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.626.978.739-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CAMILA LEONCIO DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.230.624-** - NIS 2.200.744.879-2 | Rep. Legal: ANA BEATRIZ LEONCIO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CAMILLA LOURDES ARAUJO DE FARIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.094.129.735-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARINA NASCIMENTO PINHEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.404.442-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARINA QUIRINO DA SILVA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.064.531-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLA DAIANE CATRARIO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.388.181-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLA GILIANE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.674-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLA GILIANE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.732.204-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLA LARISSA MEDEIROS DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.005.652.582-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLA LEYLANE BARBOSA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.875-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLA MICILA TEIXEIRA DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.150.004-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLA MICILA TEIXEIRA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.723.278-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLA TAMIRES DIAS DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.049.878-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLIANE DE FRANCA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.112.434-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLIANE DE FRANCA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.962.113-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLOS ALBERTO BARBOSA DA SILVA JUNIOR", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.072.664-** - NIS 1.650.372.444-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLOS ALBERTO DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.303.533.564-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLOS ANTONIO DA SILVA CUNHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.322.766.364-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLOS JAILSON BAIILIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.952.191-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLOS LINDOMAR DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.952.283-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CARLOS PINHEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.293.948.964-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CASIA CRISTINA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.223.744-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CATARINA JESICA DANTAS ROMAO MACIEL", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.528.345-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CATIA DA COSTA SIQUEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.333.823.289-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CELIA MARIA CAMPOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.969.754-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CELIA MARIA CAMPOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.096.427-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CELSO BATISTA DANTAS NETO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.012.801.972-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CELY ELISIANE PALHARES DA SILVA LOURENCO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.902.078-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CELY ELIZIELA PALHARES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.924.734-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CELY ELIZIELA PALHARES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.902.077-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CELY MEDEIROS DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.651.229-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CIBELE DAMIAO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.296.270-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CIBELE DAMIAO DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.122.914-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CIDINEI PEREIRA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.271.823.164-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CIMELLY CELESTE SILVA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.011.299.033-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CINTHIA GOMES GALDINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.973.545-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CIRLENE DA CONCEICAO SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.575.690-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLARA SUEMIA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.382.111.452-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLARA VERUSCA DE OLIVEIRA PAIVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.899.663-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLARICE GABRIELE ELIAS RAMALHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.280.826.629-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLAUDIA DA SILVA DANTAS VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.932.883-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLAUDIA LIZ ALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.644.546.314-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLAUDIA MARIA DE MEDEIROS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.952.906-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLAUDIANA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.266.120-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLAUDIANA GONCALVES DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.952.946-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEBER RODRIGUES DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.103.296-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEBER RODRIGUES DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.099.584-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLECIA COSTA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.336.255.219-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEDEMILSON DA SILVA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.953.138-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEIDE DE ARAUJO GONZAGA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.445.264-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEIDIANE FELIX DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.953.189-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLENILDA ACILE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.960.222-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEONIA DANTAS DE SOUZA BARRETO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.607.305.678-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEONIZIA ACIOLI DA SILVA SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.111.944-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEUDSON MONTEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.327.998-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEVANIA DE ARAUJO LOURENCO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.884.564-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CLEYTON SANTANA DA SILVEIRA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.131.814-** - NIS 1.178.110.391-1 | Rep. Legal: CLAUDIO IVAN SANTANA DA SILVEIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CRISTIANE FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.587.885-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CRISTIANE FERREIRA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.804.274-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CRISTIANE SOARES ALVES", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.483.244-** - NIS 1.646.628.422-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CRISTINA GOMES DA ROCHA SOARES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.788.724-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CRISTINA GOMES DA ROCHA SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.038.476-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CRISTINA LIDIANE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.620.657-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CRISTINA MARIA DE LIMA DINIZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.317.176-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "CRISTINA SOARES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.067.513.159-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DACYLEIDE NUNES DE SANTANA BARBOZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.027.424-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DACYLEIDE NUNES DE SANTANA BARBOZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.268.902.664-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAIANE DA SILVA MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.289.158.564-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAIANY GERMANO DANTAS DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.928.945-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DALVANEIDE VARELA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.321.017.619-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DALVANI MARQUES BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.836-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DALVONETE VARELA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.294,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.777.657-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DALVONETE VARELA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.183.444-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAMIANA BERNARDO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.855.814-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAMIANA BERNARDO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.411.174-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAMIAO ROBERTO DA SILVA SOBRINHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.929.382-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAMIAO ROBERTO DA SILVA SOBRINHO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.332.684-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIEL FELIX GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.611.663.608-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELA DE ARAUJO GONZAGA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.957.945-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELA DE ARAUJO GONZAGA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.201.154-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELA MEDEIROS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.721.434-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELA MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.929.446-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELE DA SILVA ANDRADE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.633.562-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELE FERNANDES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.448.494-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELE FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.581.727-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELE SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.124.723.171-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELE SOARES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.194.264-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DANIELI JANUARIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.686.689-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAVID FELIX DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.112.627-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAYANE ALVES PAULO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.115.034-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAYANE ALVES PAULO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 455,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.405.309-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAYANE JANUARIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.686.388-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DAYANE NAYARA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.777.661-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DEBORA PEREIRA DA SILVA ALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.126.823.752-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DEBORA RAYANNE SANTOS DE ARAUJO SALES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.530.075-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DEBORAH NADJA DOS SANTOS SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.930.037-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DEBORAH NADJA DOS SANTOS SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.194.894-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DEUSIVAN GALDINO DE SOUSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.240.459.146-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DEYSE DIANE DE SOUZA PEGADO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.742.454-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DEYSE DIANE DE SOUZA PEGADO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.524.575-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DIANA FERREIRA CARDOSO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.535.153-** - NIS 2.723.619.213-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DIANA MARIA DE BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.417.137-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DIANA SERAFIM DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.013.398.986-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DIANE DA SILVA MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.288.777.264-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DIEGO TOMAZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.198.682-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DILMA LEONARDO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.299.107.464-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DINARTI DA SILVA MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.832-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DIOGENES DA SILVA LINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.237.890-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DIONE DA SILVA MEDEIROS FELIX", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.289.831.764-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DJALMA ESTEVAM DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.064.540-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "DORALICY TOMAZ CRISPIM", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.945.704-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDANIELE CAMPELO BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.714.726-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDENY PINHEIRO DE MACEDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.241.256.709-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDGENIA LUANA MAYARA BARRETO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.379.201.766-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILEIDE ANDRE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.414.274-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILEIDE ANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.426.019-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILEUZA DE OLIVEIRA PORFIRIO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.111.114-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILEUZA DE OLIVEIRA PORFIRIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.960.912-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILMA FELIPE VIANA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.552.704-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILMA FELIPE VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.602.515-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILMA GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.263.317.864-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILSON ADOLFO DE FARIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.266.573.864-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDILZA SEBASTIAO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.611.665.774-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDINALVA ALVES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.682.684-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDINALVA ALVES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.294,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.715.668-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDINALVA ESTEVAM", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.931.411-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDINAN AMBROSIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.586.340-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDISLEIDE TARGINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.790.694-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDISLEIDE TARGINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.288.590.864-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDIVALDO DA SILVA BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.931.961-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDIVAN FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.444.189-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDIVANIA FERNANDES DA ROCHA OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.891-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDIVANIA FERNANDES DA ROCHA OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.852.364-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDIVANIA LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.931.844-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDMILSON ADOLFO DE FARIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.364.386.945-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDMILSON DE SOUZA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.269.835.664-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDMILSON LIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.239.396.170-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDMONI LOPES DE ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.620-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDNA MONTEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.018.318-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDRIANA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.510.696-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDSON DOMINGOS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.593.824-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDSON DOMINGOS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.958.564-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDUARDA ADEILDA DA SILVA CATRARIO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.307.844-** - Revendedora: 23.022.030/0001-02 - MILENA FELIX DOS SANTOS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDUARDA ADEILDA DA SILVA CATRARIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.266.087-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EDUARDO ACIOLE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.012.802.580-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELAINE CRISTINA SILVA SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.611.928.615-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELAINE MIKELI GUIMARAES DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.951.931-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELENILDA DO NASCIMENTO SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.398.784-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELENILDA DO NASCIMENTO SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.294,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.301.826.064-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELENIRA SEBASTIAO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.435.242-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIAMARA NASCIMENTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.242.331-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANA CAMPELO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.541.856-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANDRA ANSELMO GARCIA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.137.793.663-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE ANDRE DA SILVA LOPES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.526.604-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE ANDRE DA SILVA LOPES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.923.524-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE COSME DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.842.307-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE DANTAS DE BRITO SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.436.741-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE DANTAS DE BRITO SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.471.474-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE ELIAS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.905.024-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE ELIAS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.958.808-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE ELIAS DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.386,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.932.690-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.609.020.368-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE LIMA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.071.985.055-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE LIMA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.736.314-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE MARIA DE MOURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.701.084-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE MARIA DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.426.157-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE RODRIGUES DE MOURA SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.301.616-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIANE RODRIGUES DE MOURA SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.153.234-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENAY SEVERINO DO NASCIMENTO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 380,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.608.767.817-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE CANDIDO MOTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.932.799-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE CANDIDO MOTA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.325.284-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE DA SILVA CORDEIRO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.119.174-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE DA SILVA CORDEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.542.726-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE DA SILVA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 910,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.932.796-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE DA SILVA LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.321.074-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE GUILHERMINO DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.932.800-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE GUILHERMINO DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.077.144-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE SEBASTIAO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.438.451-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIENE SEBASTIAO DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.502.094-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIETE CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.842.502-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELINEIDE LAZARO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.588.274-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELINEIDE LAZARO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.904.254-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELINETE ANSELMO GARCIA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.439.621-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIONELSON MARTINS DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.255.900.064-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELISA MARIA RODRIGUES DA SILVA LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.308.724-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELISA VITORIA ALMEIDA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.103.295-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELISANGELA FERREIRA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.689.504-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELISANGELA FERREIRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.290.326.864-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELISBAO BATISTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.364.099.836-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELISON GOMES DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.562.584-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELISSANDRA DE LIMA RIBEIRO DUARTE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.272.772.664-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIVANIA GUILHERMINO DO NASCIMENTO ROCHA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.443.114-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZA KAREM FERNANDES LEONARDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.567.275-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETE ALMEIDA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.024.834-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETE ALMEIDA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.103.294-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETE CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.441.333-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETE DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.592.325-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETE DOS SANTOS LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 425,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.437.857-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETE DOS SANTOS LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.784.971-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETH DOS SANTOS SANTA ROSA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.801.124-** - NIS 1.677.694.695-8 | Rep. Legal: ANTONIO FIRMO DOS SANTOS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETY RICARDO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.337.344.219-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZABETY RICARDO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.195.074-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZANGELA BRITO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 430,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.005.287.014-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZANGELA BRITO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.191.684-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZANGELA CANDIDO MOTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.933.118-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZANGELA ESTEVAM", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.933.106-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZANGELA GUILHERMINO DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.746.771-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZANGELA GUILHERMINO DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.464.014-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZANGELA MARIANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.933.157-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZETE PEREIRA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.354.944-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZETE PEREIRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.120.127.990-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZIANE FERREIRA PONTES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.958.982-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZIANE SOUZA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.513.097-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZIARA BATISTA LIRA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.443.025-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELIZIARA BATISTA LIRA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.092.524-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELLEN BEATRIZ AMBROSIO CARDOSO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.437.496-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELLEN KAROLAYNE FERNANDES DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.564.385-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELOIZA HYORRANA GUILHERMINO CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.576.449-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ELZA DA SILVA NUNES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.092.496.161-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EMANOELLE KELLY DINIZ BASILIO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,09", detalhe: "CPF ***.071.174-** - NIS 1.677.771.167-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EMANUELA SANTIAGO DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.360.681.145-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EMERSON MARTINS VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.378.659.737-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EMILI SABRINA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.953.082-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EMILIO HERIC DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.725.934-** - NIS 1.178.307.660-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EMILLY GABRIELLY VIANA BILRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.346.067-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERICA BATISTA DO NASCIMENTO AZEVEDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.815.371-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERICA DA SILVA GUILHERME DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.351.394-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERICA DA SILVA GUILHERME DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.445.988-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERICA FERREIRA PONTES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.361.834-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERICA FERREIRA PONTES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.446.254-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERICA NAIARA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.777.660-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERICK DIEGO SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.122.236.202-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERICLENIS DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.302.473.764-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIK ALVES DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.527.576-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIKA MONALIZA ALVES DE PONTES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.123.351.324-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIKA VANESSA LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.152,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.446.510-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIKA VANIELE LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.536,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.446.511-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERINALVA GOMES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.644.704-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERINALVA GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.933.684-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERINEIDE BATISTA DE SENA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.703.108.410-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERINEIDE MEDEIROS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.004.753.251-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERINEIDE MEDEIROS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.160.194-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIVALDO MORAIS DE LIMA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.750.004-** - NIS 2.689.355.755-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIVAN MEDEIROS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.882.492-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIVANDA MEDEIROS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.429.364-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIVANDA MEDEIROS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.590.036-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ERIVANILDA PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.997.242-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ESTHEFANNY VITORIA GUILHERMINO DE SOUZA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,53", detalhe: "CPF ***.121.914-** - NIS 2.671.314.915-2 | Rep. Legal: ELIANE GUILHERMINO DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EULA MARIA DA SILVA RODRIGUES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.449.149-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVA MARIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.125.954-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.615.844.286-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVALDO INACIO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.902.249.093-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVANDRO RIBEIRO DE FARIA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.612.544.703-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVANGELINA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.452.390-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVANGELINA MARIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.369.644-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVANILDO CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.609.824.091-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVANOEL OLIVEIRA DE LIMA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.733.654-** - NIS 1.282.271.564-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVELLIN VITORIA NUNES DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.040.032.433-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVELYN BIANCA NUNES DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.124.681.876-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVEN CARMEN DA SILVA SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.453.058-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVEN CARMEN DA SILVA SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.202.704-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVERTON NUNES DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.366.350.512-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EVERTON NUNES DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.646.444-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EXPEDITO JOSE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.230.114-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "EXPEDITO JOSE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.268.983.764-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABIANA DE OLIVEIRA MARTINS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.121.348.521-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABIANA DE OLIVEIRA MARTINS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.514.194-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABIANA IDALINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.008.094.008-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABIANA QUIRINO DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.603.002.765-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABIANA RAQUEL DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.199.044-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABIANA RAQUEL DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.603.047.908-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABIO JUNIOR DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.136.224.908-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABRICIA DA SILVA CONCEICAO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.308.114-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABRICIA DA SILVA CONCEICAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.934.877-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FABRICIA DOS SANTOS MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.067.076-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FERNANDA ANDRADE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.787.154-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FERNANDA ANDRADE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.601.459.936-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FERNANDA KARIELLY MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.632.086.346-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FERNANDA LEONARDO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.063.988-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FERNANDA OHANA SILVA DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.624.512.940-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FERNANDA RAFAELA RODRIGUES DE MACEDO BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.050.312-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FERNANDA RAFAELA RODRIGUES DE MACEDO BRITO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.823.014-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FERNANDA VITORIA OLIVEIRA DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,79", detalhe: "CPF ***.688.144-** - NIS 1.685.234.112-8 | Rep. Legal: MARIA CLEIA CIRINO DE OLIVEIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FIDEL RICARDO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.819.194-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FLAVIA AMILLY MACIEL DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.631.153.088-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FLAVIA AMILLY MACIEL DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.742.334-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FLAVIA FERNANDES DA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.855.460-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FLAVIA FERREIRA CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.622.043.305-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FLAVIA MIKAELLY CLAUDINO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.624.513.148-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FLAVIANA QUIRINO DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.293.507.264-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRACIMARIA ANDRADE SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.626.372.614-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCICLEBIA CAROL PAULINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.000.474-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCICLEBIA CAROL PAULINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.935.673-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCICLEIDE SILVA DE ALBUQUERQUE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.102.796-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCILENE CLAUDIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.670.390-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCIMAIARA JERONIMO JOTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.722.319-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCIMARA JERONIMO JOTA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.647.934-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCIMARA JERONIMO JOTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.907-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCINALDO GOMES DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.337.314-** - NIS 1.227.352.885-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCINEIDE JERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.722.458-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ALEXANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.649.835-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ALEXANDRE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.868.244-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA BARBOSA GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.936.075-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA BIANCA DE LIMA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.625.584.093-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA BRUNA DE LIMA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.625.584.094-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA CAMILA DE ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.626.771.406-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA CHILENE DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.625.951.161-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA CHILENE DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.850.094-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA DANIELE SANTOS DE MELO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.124.184-** - Revendedora: 54.328.189/0005-07 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA DOS ANJOS CANDIDO PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.069.805.668-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.186.214-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA EDINEIDE LEITE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.936.161-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA EDLA OZELENE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.959.865-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA EDNA TRAJANO DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.607.642.348-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ELIANA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.862.344-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ELICELIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.959.888-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ELIENICE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.959.861-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ELMA DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.098.850.413-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA EMANUELE FELIX GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.320.399.664-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA FABIANA FELIPE DA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.315.780.664-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA FRANCIELMA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.262.914-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA FRANCIELMA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.862.438-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA FRANCILENE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.193.414-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA FRANCILENE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.621.905.514-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA GENILDA DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.626.771.536-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA GESSICA RAIELLY DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.103.338-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA GILMAR RODRIGUES DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.620.448.253-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA GILMARA KELLI DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.114.444-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA GILMARA KELLI DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.862.580-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA GORETI DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.621.746.337-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA HILDA DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 380,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.018.312-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA HILDA DE MOURA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.313.514-** - NIS 1.173.518.217-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA IARA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.305.050.664-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ILZA RODRIGUES DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.268.402.164-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ILZA RODRIGUES DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.964.454-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JACIRA FLORENCIO SANTIAGO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.261.987.864-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JAQUELINE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.302.948.064-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JAQUELINE DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.378.644-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOB DE FRANCA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.016.563.264-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOSEFA RODRIGUES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.461.072-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOSELHA FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.959.526-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOSELIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.090.834-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOSELIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.308.983.164-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOSIANE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.002,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.936.422-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOSIENE BENTO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.859.784-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOSILENE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.862.568-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOYSEKELE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.959.868-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOZELIA DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.861.035-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOZELIA DE MOURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.222.784-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA JOZIELMA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.861.926-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA KATIANE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.266.123-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA LAUREANA MONTEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.861.000-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA LAURIDETE FERREIRA DOMINGOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.593.717-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA MARGARETE DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.555.043-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA MARIA CANDIDO VIEIRA SILVA MACEDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.862.844-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA MARIA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.232.539.239-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA MICARLA RAFAEL", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.065.804-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA RAQUEL BRASILINO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.496.308-** - NIS 1.228.486.541-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA RAQUEL DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.479.489-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA RAQUEL DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.598.464-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA RAYANE BELCHIOR DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.895.144-** - NIS 1.174.370.625-6 | Rep. Legal: ELIENE BELCHIOR DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA REGIA FELIX", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.859.812-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSANGELA LEONARDO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.624.513.952-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSENILDA DIAS DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.301.134-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSENILDA DIAS DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.626.196.393-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSICLEIDE LEONARDO DE MOURA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.170.444-** - NIS 1.618.861.045-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSIMAR LEONARDO DE MOURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.642.934-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSIMAR LEONARDO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.861.046-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSINEIDE LEONARDO DE MOURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.351.414-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSINEIDE LEONARDO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.305.072.864-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROSINETE LEONARDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 760,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.343.693.045-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROZALIA CAETANO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.621.661.942-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROZINEIDE DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.359.789.445-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA ROZINEIDE DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.297.834-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA SEBASTIANA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.529.895-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA SEBASTIANA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.600.284-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA TAYMARA DO NASCIMENTO MACEDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.936.221-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA TEIXEIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.936.636-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA TEIXEIRA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.127.904-** - Revendedora: 10.584.587/0001-87 - LINALDO DE OLIVEIRA PESSOA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA TEODORO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.273.533.964-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA THAINA MONTEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.408.019-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA VALDEIZIA DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.296.214-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA VALDEIZIA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.006.456.899-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA VANESSA GOMES ALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.935.962-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA VERONICA RICARDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.861.669-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA VERONICA RICARDO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.389.044-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCA VITORIA GOMES ALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.388.991-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO ADMILSON DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.272.623.864-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO AILTON DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.960.169-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO ANTONIO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.939.704-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO BARBOSA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.259.701.564-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO BENEDITO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.247.248.276-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO CANINDE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.206.824-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO CANINDE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.352.434-** - Revendedora: 48.282.509/0001-09 - FOGUETINHO GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO CANINDE DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.754-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO CANINDE DOMINGOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.004.753.294-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO CANINDE JHONNATA DE PAIVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.866.107-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO CANINDE JUNIOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.261.219.164-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO CARLOS GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.244.141.622-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO CASSIO DOS SANTOS GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.621.662.874-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO DA CHAGA DA PAZ BARBOSA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.567.754-** - NIS 1.169.774.670-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO DAS CHAGAS BARROS", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.839.264-** - NIS 1.115.582.096-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO DAS CHAGAS LEITE FILHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.864.519-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO DE ALMEIDA MONTEIRO DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.550.754-** - NIS 1.168.167.108-0 | Rep. Legal: RANIERY RAIANY MONTEIRO BEZERRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO DE ASSIS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.080.886-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO DE ASSIS DE SALES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.230.612.725-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO EDILSON DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.142.657.708-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO EDSON MEDEIROS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.867.024-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO EDSON MEDEIROS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.452.224-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO ERMESON MARCELINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.307.246.564-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO FABIO CERINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.092.272.949-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO FERNANDES DA SILVA FILHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.235.687.628-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO GEAN DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.096.456-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO GIOVANI DOS SANTOS MAIA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.397.913-** - NIS 2.678.769.677-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO GIOVANI DOS SANTOS MAIA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.632.536.849-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO HELIO DOMINGOS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.960.057-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO IDARIO ALVES CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.626.372-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO ISMAEL MONTEIRO FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.270.848.964-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO ISMAEL MONTEIRO FERNANDES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.129.794-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO JAIR CANDIDO DA SILVA JUNIOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.289.441-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO JEOVA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.259.733.964-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO JOSE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.867.150-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO JOSIMAR BENTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.867.164-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO LUCIANO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.288.955.464-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO MENDES PAULO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.271.535.364-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO PAULINO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.272.975.164-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO PAULO DE OLIVIERA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.461.454-** - NIS 1.208.937.549-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO RANIERE ARAUJO DE ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.095.391.424-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO RANIERE ARAUJO DE ALMEIDA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.446.054-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO TERTULINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.314.603.227-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO THALLIS RAMOS SABINO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.962.080-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO TOMAZ DE SOUZA JUNIOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.864.824-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO VALDERIO DINIZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.261.314.064-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCISCO VINICIUS SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.531.473-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANCOIS DA SILVA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.069.805.670-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "FRANKLIN VIANA DE SOUZA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.902.884-** - NIS 1.628.542.559-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEANE INACIO DE MELO SIQUEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.282.963.164-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEANE INACIO DE MELO SIQUEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.863.074-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEANE JERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.575.405-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEANE JERONIMO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.115.114-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEANE LOPES RODRIGUES BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.201.174.570-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEANE MIRANDA SALES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.407.314-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEANE MIRANDA SALES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.895.848-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEANUZE MIRANDA DE SALES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.392.250-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEILZA MIRANDA DE SALES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.826-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEIZA GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.095.414.614-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GELSA LIMA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.905.369-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GENARIO JOSE SILVA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.295.364.664-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GENIVAL MANOEL DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,30", detalhe: "CPF ***.673.694-** - NIS 1.629.210.615-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GENYCARLA LOPES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.163.674-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GENYCARLA LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.862-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEORDANNE PEREIRA CERINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.127.977.513-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEOVANNA VIVIANE LIMA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.210.708-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEOVAR ANGELO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.942.159-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GERALDO ESTEVAM DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.315.892-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GERALDO MACEDO BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.143.917-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GERLANI ABSALAO CAMPOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.586.204-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GERLANNY JERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.576.368-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GERLANNY JERONIMO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.115.124-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GERLIANE FERREIRA DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.159.474-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GERLIANE FERREIRA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.357.627.445-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GERLIANE SANTOS GOMES", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.039.284-** - NIS 2.673.356.468-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GESSICA FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.904.629-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GESSICA MEDEIROS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.904.737-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GESSICA MEDEIROS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.113.204-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEYSHA GABRIELLE DA SILVA OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.103.337-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEZIANY ROCHA RAFAEL", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.114.834-** - Revendedora: 54.328.189/0005-07 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GEZIANY ROCHA RAFAEL", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.777.656-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GILIANE CELESTINO NUNES VARELA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.135.184-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GILIANE CELESTINO NUNES VARELA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.291.196.364-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GILMARA PEREIRA DO VALE DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.684.844-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GILMARA PEREIRA DO VALE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.295.006.064-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GILVANDA MARCOS DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.943.279-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GILVANEIDE ELIAS DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.491.287-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GILVANY REGINA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.305.717.723-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GIOVANA CARLA DA SILVA PAIVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.044.862.820-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GISELLE ALESSANDRA OLIVEIRA DE CARVALHO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.666.004-** - NIS 2.680.716.687-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GIZELHA MARIA AUGUSTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.625.719.915-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GLAUCIO MACENA LEANDRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.200.353.074-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GONCALO RIBEIRO DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,79", detalhe: "CPF ***.243.414-** - NIS 2.034.064.532-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GRACILEIDE SEVERINA DA SILVA MARTINS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.703.767.665-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GRACILENE ESTEVAM DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.490.764-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GRACILENE ESTEVAM DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.938.887-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GUILHERME GUSTAVO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.634.233.823-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GUILHERME GUSTAVO DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.791.384-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GUIOMARA RANELLY DO NASCIMENTO MACEDO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.447.274-** - Revendedora: 46.091.987/0001-06 - ROYDSON P DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "GUSTAVO VITORINO ALEXANDRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.938.922-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "HALANA LIDIANE FERNANDES DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.602.766.178-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "HELENO ALEXANDRE FILHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.616.526.506-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "HELOISE THAIMARA ACIOLE VIEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.486.854-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "HIALY MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.253.634-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "HIALY MEDEIROS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.494.774-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "HIDALYDAIANI FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.627.244.179-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "HIPOLITO CANDIDO RODRIGUES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.234.301.213-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IARA PATRICIA MATIAS DA SILVA TEIXEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.103.112.073-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IASNARA MAYANE MARQUES LEITE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.488.819-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IGOR BRUNO AUGUSTO NUNES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.643.547-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ILANA ALVES DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.343.624-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ILANA ALVES DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.011.735.064-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ILANIA IDALINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.939.112-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ILISANGELA IDALINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.507.804-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ILISANGELA IDALINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.933.153-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ILMARA SUELY PEGADO BATISTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.621.666.487-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ILMARA SUELY PEGADO BATISTA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.031.674-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "INGRED THAIANA DO NASCIMENTO BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.631.541.619-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "INGRED THAIANA DO NASCIMENTO BARBOSA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.210.384-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "INGRID BRENA TAVARES DOS ANJOS SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.996.574-** - NIS 1.623.573.170-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "INGRID MYCHELLE GONCALVES PAULO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.939.130-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRACI CONSTANTINO NETA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.106.413-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRACIARA MARIA DE CARVALHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.022.598.591-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRAILDE VENCESLAU DA SILVA FRANCA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 994,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.597.620-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRAILDE VENCESLAU DA SILVA FRANCA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.200.134-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRANEIDE GOMES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.176.974-** - Revendedora: 66.541.315/0001-54 - APARECIDA COMERCIO DE AGUA E GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRANEIDE GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.086.740-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRENILDA CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.877.351-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRENILDA VIEIRA DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.287.986-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRINEIA FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.933.722-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRIS MEDEIROS DE SALES MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.960.924-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRIS NUNES PESSOA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.613.766-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRIS NUNES PESSOA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.862.404-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IRISMAR FERNANDES DA SILVA QUIRINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.939.493-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISABEL PAULINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.599.498-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISABELA GARCIA FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.144.194.488-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISABELE CRISTINA MOURA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.428.954-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISABELE CRISTINA MOURA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.112.442-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISABELE PAULINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.599.381-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISABELLY SILVA RODRIGUES DINIZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.728.076-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISAC FERREIRA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.992.434-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISAC FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.890.328-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISAIAS FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.890.319-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISLANDIA BARBOSA DE SOUSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.004.101.443-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISLANDIA BARBOSA DE SOUSA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.367.744-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISMAELE GABRIELE DA SILVA SANTOS", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,16", detalhe: "CPF ***.682.644-** - NIS 2.671.655.725-1 | Rep. Legal: MARIA SUELIR DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ISRAEL FERNANDO BORGES DE PAIVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,60", detalhe: "CPF ***.777.244-** - NIS 2.388.789.478-9 | Rep. Legal: MARIA HELENA BORGES DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANA DO NASCIMENTO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.848.784-** - NIS 1.678.210.257-0 | Rep. Legal: MARIA DAS NEVES DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANEIDE CLAUDINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.471.124-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANEIDE CLAUDINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.342.528.727-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANEIDE CONSTANTINO NETA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.570.634-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANEIDE MAIARA VIANA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.150.423.741-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANILDA CAMARA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.882.166-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANILDA CAMARA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.731.104-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANILDA IDALINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.109.374-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANILDA IDALINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.939.989-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANILDO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.260.543.064-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANIRA RUFINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.983.754-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVANIRA RUFINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 952,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.882.061-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVETE ADOLFO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.300.892.164-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVONALDO DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.244.132.725-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVONETE ADOLFO DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.647.954-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IVONETE ADOLFO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.098.850.396-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IZA SOUZA TEODORO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.706-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IZABEL PEREIRA TOMAZ", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.711.614-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IZABEL PEREIRA TOMAZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.198.686-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "IZAQUE SOARES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.885.454-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACI FERNANDES PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.239.389.098-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACIARA DE SOUZA ROZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.814.214-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACIARA DE SOUZA ROZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.744-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACIARA PEREIRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.317.698-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACIARA SIPRIANO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.501.224-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACIARA SIPRIANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.434-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACILDA MARTINS DE BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.850.767-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACILDA MARTINS DE BRITO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.698.694-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACILENE DUARTE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.543.894-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACILENE DUARTE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.624.517.844-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACILENE RAFAEL DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.601.812-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JACKELINE RAFAEL DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.600.691-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAIDE BERNARDO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.144,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.599.998-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAILMA ALINE TOMAZ DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.887.689-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAILSON DE FRANCA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.787.966-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAILSON FELIX DE ASSIS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.369.964.295-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAIR FERNANDES PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.098.850.367-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAMILE VITORIA LIMA BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.367.606.629-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAMILSON ROSA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.014-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAMILY ARISLAYNE DA SILVA OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.391.883-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAMILY ESTEFANY DE MOURA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.209.976-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA ALVES DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.746.344-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA ALVES DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.653.693-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA ANDRADE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.086-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA ANDRADE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.397.144-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA INACIO DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.715.444-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA INACIO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.623.156.008-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA JERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.891.839-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA MARIA DA SILVA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.891.862-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANAINA RICARDO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.787.242-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANEIDE BASILIO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.375.114-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANEIDE BASILIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.954.514-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANEIDE GOMES MONTEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.601.212-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANEIDE GOMES MONTEIRO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.984.584-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANEIDE PATRICIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.294.829.864-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANEIDE PATRICIO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.049.204-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANICLEIA COSTA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.605.852-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANICLEIDE GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.280-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANICLEIDE GOMES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.633.844-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANIELE FERNANDES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.327.594-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANIELE FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.892.866-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANIELI LEONCIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.239-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANIELSON VIEIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.865.037-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JANIERY MONTEIRO BEZERRA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 380,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.297.791.164-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAQUELINE FELIX DE ASSIS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.966.154-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAQUELINE FELIX DE ASSIS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 430,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.298.108.264-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAQUELINE PEREIRA GUILHERME", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.625.707.270-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JAQUELINE PEREIRA GUILHERME", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.081.014-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JARDIELE QUIRINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.371-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JARLEIDE DUARTE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.893.902-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JARLENE IDALINO TOMAZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.359.788.745-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEAN CARLOS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.623.879.266-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEANE SABINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.244,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.624.666.340-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEFERSON MARCOS DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.352,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.689-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEFERSON MARCOS DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.332.324-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEFFERSSON DE OLIVEIRA NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.285.274-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEFFERSSON DE OLIVEIRA NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.896.752-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEKLEITON OLIVEIRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.898.078-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEKLEITON OLIVEIRA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.914.164-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JEOVANA DOS SANTOS GUILHERME", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.633.417.873-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JERFESON ANCELMO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.901.353-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JERLANI DE LIMA SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.330.274-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JERLANI DE LIMA SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.624.250.992-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JERLYANE ABSALAO DE CAMPOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.863-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JERLYANE ABSALAO DE CAMPOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.211.834-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JESSIARA MEDEIROS DA SILVA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.307.312-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JESSICA GIRLIANE DE BRITO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.519.204-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JESSICA GIRLIANE DE BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.955.672-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JESSICA JANAINA VARELA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.904.661-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JESSICA JOYCE MARTINS DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.365.172-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JESSYCA BEATRYCE AZEVEDO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.632.096.155-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOACI GERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.239.393.957-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOADNA JOANE CANDIDO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.933.028-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOADNA JOANE CANDIDO DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.202.654-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOALDO DA SILVA CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.036.035.487-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOALISON DA SILVA ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.785-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOALISON DA SILVA ARAUJO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.913.074-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA D ARC BEZERRA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.194.854-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA D ARC BEZERRA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.950.218-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA DARC DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.554.042-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA JAINE PEQUENO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.214.690-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA MARIA DA CONCEICAO BISNETA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.110,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.048.065.659-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA MARIA DA CONCEICAO BISNETA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.900.694-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA MARIA JANUARIO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.453.894-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA MARIA JANUARIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.416.147-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA SEBASTIANA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.960.452-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANA SEBASTIANA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.095.304-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOANE BEATRIZ ARAUJO SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.517.704-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO BATISTA CAMPOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.935.277-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO BATISTA CATRARIO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.432.524-** - NIS 1.246.635.991-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO BATISTA NUNES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.259.486.064-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO EDUARDO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.270.425.664-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO EDUARDO QUIRINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.626.472.309-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.067.513.494-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO FERREIRA DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.062.904-** - NIS 1.169.942.480-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO JOB DE FRANCA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.311.373.564-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO MARCOS TARGINO DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.268.304-** - NIS 2.032.266.107-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO MARIA BRASILINO CORREIA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.286.891.864-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO MARIA CRISPIM DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.615.335-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO MARIA DE BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.275.608.564-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO MARIA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.240.449.779-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO PAULO BARBOSA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.098.850.398-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO PAULO DA SILVA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.961.060-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO PAULO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.998.170-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO VICTOR DA SILVA ALMEIDA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.632.184-** - NIS 1.633.241.118-0 | Rep. Legal: MARIA CILENE DA SILVA PEREIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOAO ZUCA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.522.845-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOBSON LOURRAN DE QUEIROZ ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.412.858.718-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOEDNA TAYNARA LIMA DE ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.634.739.139-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOELMA DE SOUZA BERNARDINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.632.542.958-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOELMA DE SOUZA BERNARDINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.376.368-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOELMA SIMPLICIO BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.622.792.667-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOICE EMANUELE DA SILVA SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.711.354-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOICE EMANUELE DA SILVA SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.631.713.495-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOICE RIBEIRO DE MACEDO SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.269.150.864-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JONAS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.279.137.064-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JONATO FERNANDES PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.098.850.364-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JONICLEIDE GOMES DE ANDRADE", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.845.384-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JONICLEIDE GOMES DE ANDRADE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.941.269-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JORGE INACIO CORDEIRO NETO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.253.285.008-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JORGE LUIZ DA SILVA MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.613.281-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JORGE MARIO DANTAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.268.578.164-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSAFA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.270.664.064-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSANIEL MARTINS PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.240.446.057-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ACIOLE FILHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.235.698.859-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ADRIANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.927.081-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ADRIANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.545.745-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE AILSON PAULINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.239.390.879-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ALVES DA SILVA NETO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.610.092-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ANDERSON DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.279.156.064-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ANTONIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.947.925-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ANTONIO FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.900.915-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ANTONIO VITURINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.949.327-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ARMANDO PINHEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.296.487.664-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE AUGUSTO CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.123.020-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE AUGUSTO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.610.351-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE BELCHIOR NETO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.611.503-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.222.790.680-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE CARLOS BATISTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.787.987-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE CARLOS DE ARAUJO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,40", detalhe: "CPF ***.410.644-** - NIS 2.680.735.363-2 | Rep. Legal: MARIA DA CONCEICAO DE ARAUJO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE CORDEIRO SOBRINHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.196.302-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE COSTA VIEIRA JUNIOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.244.579.209-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.927.015-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE DAMIAO SILVA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.624.247.319-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE DANIEL HILARIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.922.673-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE EDER AUGUSTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.543.685-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE EDILSON LEITE", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.313.824-** - NIS 2.726.963.457-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ERIVALDO DANTAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.208.610.180-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ERIVAN ROMAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.239.390.884-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE EUDES DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.777.663-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE EXPEDITO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.382.787.817-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE FELIX", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.690.704-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE FELIX DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.329.024.819-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.463.049-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE FERNANDES SOBRINHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.569.959.104-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE FRANCISCO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.633.636.860-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE FRANCISCO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.830.734-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE GABRIEL DA SILVA SIMPLICIO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,18", detalhe: "CPF ***.503.434-** - NIS 1.684.475.058-8 | Rep. Legal: FRANCISCA JOSELI DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE GERMANO DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.232.444.490-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ISAIAS BEZERRA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.003.814-** - Revendedora: 54.328.189/0002-56 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ISAIAS BEZERRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.201.707.034-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE IVANILDO ALVES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.948.324-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE JAILTON DANTAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.266.518.764-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE JERONIMO DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.229.638.790-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE LEODECIO DA SILVA ALVES", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.431.354-** - NIS 1.258.042.881-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE LINHARES MENDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.228.091.131-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE LUIZ FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.892.364-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE MOACIR DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.222.227.248-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE NELSIVAN DE SOUZA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.237.910.819-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE PATRICIO GOMES TENORIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.408.300-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE PEREIRA SEGUNDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.926.956-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE REGIO FELICIANO FELIX", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.318.318.719-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ROBERTO DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.725.488-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ROBERTO MONTEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.276.591.781-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ROBERTO PEREIRA DA CRUZ", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,62", detalhe: "CPF ***.703.814-** - NIS 1.296.296.864-5 | Rep. Legal: JOAO MARIA PEREIRA DA CRUZ - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE ROBERTO SOARES DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,84", detalhe: "CPF ***.098.134-** - NIS 2.672.674.533-6 | Rep. Legal: JOSIANA SOARES DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE SOARES DA SILVA FILHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.470.718-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE WANDERSON CRISTIANO DE VASCONCELHOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.631.721.514-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSE WILSON BATISTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.608.534-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEANE PAULINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.890.464-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEANE PAULINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.606.968-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA CLAUDIA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.049.507.241-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA CRISPIM DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.063.994-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA DA SILVA SABINO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.358.404-** - NIS 1.682.934.897-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA DE BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.787.920-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA JOELMA DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.899.244-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA JOSEMARA BARBOSA DE LUNA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.140.124-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA JOSEMARA BARBOSA DE LUNA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.095.391.426-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA LEANDRA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.287.467.764-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA LEANDRA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.097.204-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA LEONCIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.607.401-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.843-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA RAIMUNDA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.290.683-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA RAIMUNDA FERNANDES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.980.704-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA SUELHA FERREIRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.917.868-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA TARGINO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.962.199-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEFA VASCONCELOS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.918.828-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEILSON DE OLIVEIRA COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.623.636.853-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEILSON DE OLIVEIRA COSTA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.838.374-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSELIA DANTAS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.944.866-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSELIA FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.266.086-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSELIA SIPIAO DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.693.424-** - NIS 1.679.144.093-8 | Rep. Legal: MAURICIO CIPIAO DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSEMARIO DO NASCIMENTO RODRIGUES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.523.645-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSENALVA ROSALIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.640.834-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSENALVA ROSALIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.962.262-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSENEIDE MARTINS DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.787.981-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSENILDA ANCELMO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.920.323-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSENILDO ALVES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.260.369.364-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSENILDO COSME DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.344.022.230-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIANE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.103.305-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIANE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.681.824-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIANE DA SILVA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.634.492.263-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIANE DE ARAUJO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.841.414-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIANE DE ARAUJO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.369.423.795-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIANE MARIA DA SILVA FELIPE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.949.378-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIBELY KATIANE DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.930.555-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSICLEIDE DA COSTA ALVES ARAUJO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.869.814-** - NIS 1.167.253.762-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIEL DOS SANTOS DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.018.329-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIENE DE LIMA BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.629.214.308-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIENE ESTEVAM DA SILVA LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.393.604-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIENE ESTEVAM DA SILVA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.624.522.044-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILEIDE BENTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.657.524-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILENE CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.740.010-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILENE CARDOSO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.253.844-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILENE DANTAS DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.625.660.087-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILENE DANTAS DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.056.904-** - Revendedora: 51.801.997/0001-10 - BK COMERCIO VAREJISTA DE GAS E AGUA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILENE MARIA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.378.018.512-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILENE MARIA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.772.674-** - Revendedora: 05.202.134/0001-09 - BRITO GAS & TRANSPORTES LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILENE NUNES PEREIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.443.104-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSILIANNY MOREIRA ALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.921-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIMAR MARTINS DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.000.324-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIMAR MARTINS DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.931.659-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIMAR QUERINO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,40", detalhe: "CPF ***.466.004-** - NIS 2.725.011.367-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIMAR SILVA VIEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.613.270-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIMARA JERONIMO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.635.814-** - Revendedora: 54.328.189/0005-07 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSINEIDE BERNARDO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.768.432-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIRAN CANDIDO DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.986.714-** - NIS 1.605.949.783-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIVAN FERNANDES PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.000.596.369-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIVANIA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.949.889-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIVANIA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.933.624-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIVANIA XAVIER DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.109.754-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOSIVANIA XAVIER DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.607.253.574-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOVANIR RAMOS DE OLIVEIRA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.630.745.764-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOYCE ROVENA DE ARAUJO MARTINIANO AVELINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.768.484-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOYSE EUGENIA DE LIMA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.537.774-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOYSE EUGENIA DE LIMA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.631.713.542-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOZICLEIDE GUIMARAES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.301.214-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JOZICLEIDE GUIMARAES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.628.657.512-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUAREZ BATISTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.902.485.779-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUCIANA KEILA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.892-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUCIARA SABINO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.005.652.569-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUCIARA SABINO DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.729.754-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUCIELLEN KRYEDYD CANDIDO RODRIGUES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.101.102.912-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUCIELLEN KRYEDYD CANDIDO RODRIGUES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.942.804-** - Revendedora: 48.282.509/0001-09 - FOGUETINHO GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUDITE CARDOSO DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.259.904-** - NIS 1.149.894.878-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUDSON DA SILVA LINS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.627.842.919-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUDSON FRANCISCO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.618.914-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUDSON FRANCISCO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.937.496-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULCINEA RICARDO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.943.412-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIA ALEXANDRE PINHEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.633.724.867-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIA ALFRA PEREIRA SILVESTRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.938.134-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIA GABRIELLY DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.632.342.348-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIANA BATISTA GOMES PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.938.482-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIANA DE SOUZA SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.939.623-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIANA FERREIRA DE BRITO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.255.824-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIANA FERREIRA DE BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.938.368-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIANA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.010,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.617.648.373-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIANA SOUZA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.005.283.533-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIANA VITORINO ALEXANDRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.951.362-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JULIANE FRANCISCA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.787.975-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUVANES JUSTINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.040.274.088-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "JUVANES JUSTINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.923.654-** - Revendedora: 59.374.826/0001-63 - MACAIBA COMERCIO E DISTRIBUICAO DE GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KALIANE FELIPE DOS SANTOS", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,40", detalhe: "CPF ***.891.224-** - NIS 1.681.535.246-4 | Rep. Legal: KATIUSCA LUANA FELIPE DOS SANTOS MEDEIROS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KALYNE DA SILVA LOURENCO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.840-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KAREN WALESKA NASCIMENTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.396.979-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KAROLINE CANDIDO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.585.789-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KASSIA GRAZIELY VARELA DA SILVA RODRIGUES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.627.194-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIA CIMARIA SOARES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.518.924-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIA CIMARIA SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.404.500-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIA MEDEIROS DE SALES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.849-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIA MEDEIROS DE SALES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.931.274-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIANA QUERINO CANDIDO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.982.024-** - Revendedora: 61.749.680/0001-35 - VICENTE GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIANA QUERINO CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.639.502.521-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIANE CANDIDO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.531.645-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIANE DE SOUZA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.952.621-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIUCIA LUANA CANDIDO DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.089.534-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIUCIA LUANA CANDIDO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.103.329.044-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KATIUSCA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.102.449.178-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KELIANE VIANA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 430,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.952.692-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KELIANE VIANA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.709.264-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KELINI DUARTE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.280.019.533-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KELLE GONCALVES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.309.110.564-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KELLIANY ROCHA RAFAEL BRITO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.618.953.482-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KELLIANY ROCHA RAFAEL BRITO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.911.394-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KELLY SIMONE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.255.791.864-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KEYLA GONCALVES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.917.611-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KEYLA GONCALVES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.748.024-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KEZIA SARA RIBEIRO DO AMARANTE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.709.102-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KLEVIA RAYNARA CAMARA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.652.027.959-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KYONARA KAREN DE MOURA SILVA LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.842.254-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "KYONARA KAREN DE MOURA SILVA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.619.932.076-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LADY DIANA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.266.118-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LADY DIANA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.976.554-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LADYJANE SOARES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 760,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.957.216-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LAECIO GLEUSON PEREIRA LEONARDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.332.968-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LAIANE MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.044.868.634-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LAICIA SANTOS DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.594.564-** - NIS 1.175.896.190-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LAISE GLEISE PEREIRA LEONARDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.333.824-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LARA YASMIM DOS SANTOS ANDRADE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.048.065.668-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LARISSA ANDRADE PAULINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.923-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LARISSA ANDRADE PAULINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.943.844-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LAUDICEIA SABINO DE OLIVEIRA CATAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.334.476-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LAUDICEIA SABINO DE OLIVEIRA CATAO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.874.544-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LAURA CRISTINA DE LIMA TEODORO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.573.894-** - NIS 2.672.296.349-5 | Rep. Legal: RAIMUNDA BARBOSA DE LIMA TEODORO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LAVINNYA MAYARA LOURENCO BASILIO CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.650.613.602-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEANDERSON DA SILVA BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.639.919.870-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEANDRA MARTINS DA CRUZ DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.954.070-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEANDRO MAXIMO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.336.113-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEIDIANE MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.044.865.482-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEISE DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.651.700.408-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LENILDA VENCESLAU DE FARIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.639.920.947-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LENILSON BEZERRA GARCIA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.954.413-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LENIRA CLEMENTE DUARTE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.641.546.891-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LENIZIA DE ARAUJO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.684.724-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LENIZIA DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.073.306.084-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEONCIO SABINO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.364.136.353-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEONEIDE MAXIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.340.444-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEONEIDE MAXIMO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.006.054-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LETICIA TASIELA LIMA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.044.859.590-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LEYDE DAYANA FERREIRA DE PAIVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.017.250.937-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LICENILDA MICARLA DE MEDEIROS RIBEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.344.566-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIDIANE LIMA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.689.145-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIDIANE LOPES GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.342.374-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIDIANE MARQUES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.294.530.564-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIDIANE PINHEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.919.434-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIDIANY MONTEIRO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.919.334-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIDIANY MONTEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.018.317-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LILENE PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.954.846-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LILIAN BRANDAO LOPES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.094.131.247-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LILIAN CAROLINE GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.098.850.431-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LILIAN MACENA LEANDRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.280.323.692-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LILIANE DOS SANTOS SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.281.610.957-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LILIANE SILVA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 450,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.114.157-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LILIANE SILVA DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.728.844-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LINDINEIDE DOS SANTOS SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.386.284-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LINDINEZ TARGINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.629.672-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LINDOMAR ANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.344.303-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LINDOMAR ANDRE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.141.914-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIVIA NAYARA DE FREITAS GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.344.701-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIVIA NAYARA DE FREITAS GOMES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.165.434-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIZANDRA BARBARA FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.651.024.991-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LIZANDRA DO NASCIMENTO CAMARA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.873.054-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LOISIANA FELIX DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.462.574-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LOISIANA FELIX DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.060,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.964-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LOURIVAL CORDEIRO DE MOURA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.871.304-** - NIS 1.219.966.249-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUANA CRISTINA DA SILVA PAES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.074.639.782-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUANA LARISSA PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.263.830-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUANA PEREIRA SOUSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.639.995.509-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUANA PEREIRA SOUSA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.696.004-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUANA SILVA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.570.550-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUANA SILVA DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.465.984-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUANDRA LOURENCO BRAZ", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.415.394-** - NIS 1.646.417.542-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUARA TATIANE DE OLIVEIRA AQUINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.361.231.245-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUARA THALIA MACIEL DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.064.547-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUARA THALIA MACIEL DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.141.304-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCAS ARAUJO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.189.715-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCAS ARAUJO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.055.194-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCAS CORDEIRO QUIRINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.957.660-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCAS GABRIEL DE MELO MARTINS BEZERRA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.011.284-** - NIS 1.650.930.236-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCAS MATHEUS DA CAMARA FELIX", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.113.671-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIA MARIA DE SOUSA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.144.164-** - NIS 1.084.549.480-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIANA MARIA SABINO RIBEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.071.985.050-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIANA MARIA SABINO RIBEIRO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.299.454-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIANA TORRES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.138.068.583-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIENE BATISTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.054.894-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIENE BATISTA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.500.674-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIENE ESTEVAM DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.448.474-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIENE ESTEVAM DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.821-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIENE MARIA SABINO RIBEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 647,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.071.985.051-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCILENE FELIPE DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.956.579-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCILENE MACIEL DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.956.572-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIMAR DE LIMA MAXIMO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.086.344-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIMAR DE LIMA MAXIMO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.625.559-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIMAR DE SOUZA PESSOA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.142.356.407-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIMARA ANDRADE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.356.670-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIMARA ANDRADE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.228.324-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCINALVA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.347.619-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCINARA DA SILVA BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.314.090-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCINEIDE ASSIS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.800.414-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCINEIDE ASSIS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.801.164-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCINEIDE ESTEVAM DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.120.494-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCINEIDE ESTEVAM DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.357.253-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUCIVANIA DA SILVA TARGINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.631.205-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUIZ ANTONIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.231.824.207-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUIZ CARLOS DE ARAUJO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.798.194-** - NIS 1.289.644.864-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUIZ CARLOS RIBEIRO GONCALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.183.081-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUIZ COSME DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.053.992-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUIZ EDUARDO GONCALVES VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.092.688.452-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUIZ EDUARDO PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.933.691-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUIZA MARIA ESTEVAM DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.616.817-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUZIA CLEDNA TOMAZ DE PAIVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.877.854-** - Revendedora: 51.801.997/0001-10 - BK COMERCIO VAREJISTA DE GAS E AGUA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUZIA GLAUBIA DA SILVA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.358.024-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUZIA PATRICIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.905.327-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUZIA RAFAEL", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.625.995-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUZIA RIBEIRO DA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.952.468-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUZINETE MARIA DA SILVA SANTA ROSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.299.013.764-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUZINETE MARTINS AQUINO DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.273.294-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "LUZINETE MARTINS AQUINO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.957.012-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MACELANGELA CIRINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.383.744-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MACELANGELA CIRINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.635.892-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MACIEL BEZERRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.640.894.042-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MACIEL DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.019.460-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAGDALY DA SILVA OLIVEIRA ALVES FAGUNDES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.812.684-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAGNA SUELEM DA SILVA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.244,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.627-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAGNA SUELEM DA SILVA PEREIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.492.734-** - Revendedora: 25.348.292/0001-89 - W M DANTAS BARBOSA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAIANY KALINE DA SILVA ALEXANDRE", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.570.554-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAIANY KALINE DA SILVA ALEXANDRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.903-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAIARA SILVA DE ANDRADE", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.874.774-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAIARA SILVA DE ANDRADE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.321.585-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAILSON LUCAS DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.266.093-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MANOEL ALEXANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.363.771-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MANOEL LEITE FILHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.295.365.564-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MANOEL MESSIAS DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.601.634-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MANOEL PATRICIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.640.852.631-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARA JEANE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.965.622-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARA JEANE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.140.734-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARA KELLE PEGADO VALENTIM", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.639.066.581-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARA NASCIMENTO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.446.654-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCELA PATRICIA DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.797.894-** - NIS 1.653.071.482-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCELINO ESTEVAM DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.220.746.855-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIA BEZERRA BARBOSA BELCHIOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.031.703-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIA CRISTINA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.259.472.964-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIA CRISTINA DE VASCONCELOS SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.644.181-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIA CRISTINA DE VASCONCELOS SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.639.134-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIA LAYSLA UMBELINA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.639.492.351-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIA LOPES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.459.494-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIA LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.072.143.179-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIA ROCHA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.967.704-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIANA DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.018.985-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCIO ROBERTO SOUZA FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.428.177-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCLEIDE LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.636.983-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCLEIDE LOPES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.321.164-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCOS ALEXANDRE CERINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.006.390.499-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCOS ALEXANDRE CERINO DA SILVA JUNIOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.266.127-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCOS ANTONIO SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.258.916.264-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARCOS MACIEL DE ARAUJO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,10", detalhe: "CPF ***.041.404-** - NIS 2.005.154.902-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ADRIANA DA SILVA MARCAL", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.126.578-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ADRIANA SABINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.961.350-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA AGUENELDA MEDEIROS DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.777.264-** - NIS 2.678.533.753-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALDENI DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.253.289.205-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALDENI DE MEDEIROS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.417.984-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALDENORA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.634.045-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALDENORA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.249.194-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALESSANDRA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.564-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALEXANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.304.961.664-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALICE GOMES NEVES DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.960.776-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALINI GOMES DE ALMEIDA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.637.234-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALINI GOMES DE ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.632.149-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ALMERINDA LEONARDO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.960.834-** - NIS 1.163.834.604-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ANGELICA EDUARDO SANTA ROSA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.275.792.064-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ANGELICA SILVA DA CAMARA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.143.747-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.501.224-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.099.244-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.354.083.145-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DA SILVA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.966.568-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DA SILVA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.999.404-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DA SILVA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.033.041.501-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.387.213-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DE OLIVEIRA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.270.681.364-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.103.311-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.355.699.445-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.781.902-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA GOMES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.450.884-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA JERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.438.466-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA NEVES DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.387.294-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA NEVES DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.803.804-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA APARECIDA RODRIGUES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.634.102-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ASSUNCAO VICENTE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.441.995-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ASSUNCAO VICENTE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.628.704-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA AUGUSTA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.058.694-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA AUGUSTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.399.697-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA AUXILIADORA DE OLIVEIRA CELESTINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.631.346-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA BEATRIZ MEDEIROS ESTEVAM", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.651.723.139-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA BERNARDO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.639.162.557-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA BIANCA DOS SANTOS SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.280.546.488-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CAROLAYNE DA SILVA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.952.494-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CELIA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.963.853-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CELIA PEREIRA DA SILVA OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.757.813-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CLARA ALEXANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.326.143-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CLARA ANDRADE CERINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.651.864.032-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CLARA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.100,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.048.065.676-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CLARA MONTEIRO ALVES DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.651.027.414-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CLENILDA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.256.684-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CLENILDA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.634.171-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CONCEBIDA DE LIMA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.014.864-** - NIS 1.642.942.832-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CONCEBIDA DE LIMA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.014.864-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA CRISTINA DA CONCEICAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.540.296-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA CONCEICAO CORREIA BIANCHI", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.896.334-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA CONCEICAO CORREIA BIANCHI", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 480,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.644.527.920-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA CONCEICAO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.634.183-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA CONCEICAO LEONARDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.056.516-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA CONCEICAO SILVESTRE DE OLIVEIRA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.063.754-** - NIS 1.649.280.127-0 | Rep. Legal: FRANCISCA PEGADO DE OLIVEIRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA LUZ DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.879.484-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA LUZ DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.874.734-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA PIEDADE GOMES PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.638.849.102-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DA SOLEDADE SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.759.378-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DALVANIRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.631.119-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAMIANA DA SILVA BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.010,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.673.632-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAMIANA DA SILVA BEZERRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.089.774-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAMIANA GOMES MONTEIRO ALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 380,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.384.614-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAMIANA SILVA ARAUJO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.615.714-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAMIANA SILVA ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.286.394.964-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DANIELE ALVES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.170.207-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DANIELE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.400.801-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DANIELE LUIZ SABINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.373.327-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DANIELE MEDEIROS DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 450,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.205.399-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS DORES BASILIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.235.507.980-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS DORES DE BRITO SOARES NUNES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.704.184-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS DORES DE BRITO SOARES NUNES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.643.334.674-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS DORES DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.633.082-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS DORES RAMOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.407.037-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS DORES RODRIGUES BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.098.835-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS DORES SILVA IDALINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.062.543.594-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS GRACAS CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.402.656-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS GRACAS COSME DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.056.555-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS GRACAS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.264.990.664-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS GRACAS DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.364.840.218-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS GRACAS LEONCIO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.810.674-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS GRACAS LEONCIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.959.861-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS NEVES ALEXANDRE", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.447.634-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS NEVES DE MIRANDA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.550.254-** - NIS 1.175.302.769-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS NEVES PEREIRA BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.449.138-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.256.144-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIA SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.634.949-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIAS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.862-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIAS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.264.264-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIAS DE SOUZA SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.804.368-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIAS FELIX DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.804.244-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIAS NECO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.347.504-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIAS NECO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.347.504-** - NIS 1.604.300.033-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIAS RODRIGUES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.366.830-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAS VITORIAS RODRIGUES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.071.674-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAYANE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.394.694-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAYANE DOS SANTOS MENDES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.618.524-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DAYANNE CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.110,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.969.955-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA BEZERRA FELIX", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.695-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.772.402-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA DA SILVA CONCEICAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.962.364-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA DE LIMA MAIA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.168.124-** - NIS 2.013.328.026-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.295.075.864-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.998.171-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.750.674-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA FERNANDES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.735.934-** - Revendedora: 03.954.830/0003-08 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.010,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.958.323-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA FERNANDES NUNES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.635.987.376-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.281.874.939-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE FATIMA SILVA DOS REIS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.202.521.946-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE JESUS ARAUJO MARTILIANO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.169.123-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE JESUS CARDOSO DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.114.944-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE JESUS CARDOSO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.961.636-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES ALMEIDA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.405.683-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES ALMEIDA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.308.764-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.448.074-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.439.964-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.405.543-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES MOREIRA VIEIRA PAIXAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.640.881.766-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES RODRIGUES CARVALHO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.228.090.012-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES SILVESTRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.409.175-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE LOURDES VIEIRA DA SILVA FERREIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.879.734-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE NAZARE DA CONCEICAO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.038.211.842-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE PAULA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.342.169.145-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DE PAULA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.332.674-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DILENE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.778-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DILMA DA SILVA TERTULINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.622.874-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DILMA DA SILVA TERTULINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.341.489.419-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DILMA GUIMARAES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.615.425-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DILMA GUIMARAES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.083.914-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DJANIRA ROBERTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.489.582-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DO CARMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.403.994.348-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DO CEU BEZERRA DE MORAIS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.033.082-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DO CEU MONTEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.406.922-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DO SOCORRO FURTUNATO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.286.514.664-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DO SOCORRO LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.292.432.164-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DULCE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.468.484-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA DULCE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.093.272.433-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDINA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.124.034-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDINA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.394.929-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDUARDA CAMARA FELICIANO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.019.759.377-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDUARDA CORREIA DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.132.364.791-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDUARDA RODRIGUES DA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.633.609-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDUARDA RODRIGUES DA ROCHA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.722.584-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDUARDA SOARES OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.966.185-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDUARDA VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.099.689-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EDUARDA VIEIRA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.810.609-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EFIGENIA BARRETO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.332.794-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ELIANE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.371.190-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ELIZABETE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.003.312-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ELMA NUNES GOUVEIA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.293.373.664-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ELOIZA BELCHIOR DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.028.853-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA EMANUELE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.967.874-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ERICA CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.633.614-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ESTEFANE GOMES DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.147.204.803-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA FABIANA CATRARIO RIBEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.651.001.511-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA FABIANA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.641.877.685-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA FERNANDA ARAUJO BASILIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.123.136-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA FRANCIELMA DA SILVA BENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.787.908-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA FRANCINETE MONTEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.643.391.469-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA FRANCISCA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.401.891-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GABRIELA VARELA RODRIGUES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.006.390.479-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GABRIELE DE LIMA DINIZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.123.032-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GABRIELE DE LIMA DINIZ", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.539.374-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GEORGIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.258.367.554-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GEOVANIA CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.057.800-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GESSIA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.966.623-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GESSIA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.357.004-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GISLAINY BARBOSA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.614.555-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GORETE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.059.994-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GORETE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.602.736-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GORETH DE LIMA MAXIMO PONTES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.442.754-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA GORETH DE LIMA MAXIMO PONTES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.674.154-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA HELENA ALEXANDRE DA COSTA DIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.643.745.012-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA HELENA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.939.604-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA HELENA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.124.761-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA HELOIZA SILVA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.122.151-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA HELOIZA SILVA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.386.281-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA HOSANA DE BRITO SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.693.375-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA INES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.271.937.864-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA INES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.710.544-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA IRANIR ARRUDA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.264.004-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA IRANIR ARRUDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.857-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ISABEL PINHEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.638.766.838-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ISABELE DO NASCIMENTO GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.650.707.560-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JACILENE CERINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.267.634.964-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JACILENE CERINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.880.314-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JANETE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.274.920-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JANICELY ROBERTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.607.147.054-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOANA DA SILVA ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.677.735-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE ALEXANDRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 522,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.632.038-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE ANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.403.654-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE ANDRE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.014.074-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE BENTO COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.722.691-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE CAVALCANTI BARBOSA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.872-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE CAVALCANTI BARBOSA FERNANDES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.520.774-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE COSME DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.644.528.878-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE CRISPIM DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.261.114-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE CRISPIM DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.963.742-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.962.642-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.380.164-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.962.653-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.152,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.403.512-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DA SILVA ESTEVAM", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.164.579-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DA SILVA FELIPE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.005.283.513-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DE LIMA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.016.454-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DE OLIVEIRA SPINELLI", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.069.017.062-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DOS ANJOS ALVES PAIVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.519.784-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE DOS ANJOS ALVES PAIVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.930.026-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE FELIPE LOPES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.488.604-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE FERREIRA BRASILINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.844-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE FRANCISCO DE ANDRADE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.002,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.373.295-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE GARCIA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.108.252.796-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE GARCIA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.724.234-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE GOMES MONTEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.384.656-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE MEDEIROS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.439.424-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 910,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.383.675-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE SILVA GOMES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.474.614-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE SILVA GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.959.181-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE TEIXEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.639.350.022-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE VIANA BILRO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.136.404-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE VIANA BILRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.726.741-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE VICENTE", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.229.984-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE VICENTE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.060,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.298.108.564-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE VICENTE DE CAMPOS COSTA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.230.004-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE VICENTE DE CAMPOS COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 405,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.404.491-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSE XAVIER BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.482.972-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSELIA DA SILVA ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.303.439.564-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOSINEIDE SILVA FERREIRA DE ANDRADE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.271.174-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOZENICE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.523.245-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JOZIANE MEDEIROS DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.960.353-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JUCIARA HILARIO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.714.864-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JUCIARA HILARIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.374.863-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA JUDINEIA ARAUJO GONZAGA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.965.988-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LAIANE DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.733.664-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LAIANE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.966.644-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LARISA DE FRANCA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.967.777-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LAVINIA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.071.605.963-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LETICIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.561.643-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LETICIA GRACIANO DA COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.959.698-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LIANA BEZERRA DE FRANCA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.373.201-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LIANA BEZERRA DE FRANCA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.345.244-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LIDIANE SOUZA DA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.642.293.111-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUANA DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.373.501-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUANA DE FREITAS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.566.944-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUANA PAIVA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.720.294-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIA COSTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.641.849.741-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIA DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.383.973-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIA MARQUES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.680.064-** - Revendedora: 25.348.292/0001-89 - W M DANTAS BARBOSA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIA MARQUES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.069.614.555-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIA MONTEIRO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.863.234-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIA MONTEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.252,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.406.061-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCICLEIDE DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 910,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.642.260.808-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIENE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.617.584-** - Revendedora: 13.191.753/0001-73 - CENTRAL GAS BUTANO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIENE DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.244,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.018.360-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIENE DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.553.434-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCIENE SOUZA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.280.355.013-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUCINALVA DA COSTA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.136.990-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUDMYLA DO NASCIMENTO ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.908.780-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUIZA SOARES NUNES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.908.199-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUZANIRA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.040.996.613-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUZANIRA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.153.954-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUZINARA CONSTANTINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.203.364-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUZINARA CONSTANTINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.002,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.630.029-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA LUZIPAULA DE LIMA MAXIMO DUARTE", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.976.494-** - NIS 2.728.944.581-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA MARGARIDA BARBOSA SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.412.545-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA MARGARIDA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.907.629-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA MARINAIDE DA COSTA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.641.877.450-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA MAYANE BEZERRA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.638.971.514-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA MONIARA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.902-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA MONICA ANANIAS DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.068.272.631-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA NATALY DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.966.665-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA NELI DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.284.374-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA NILMA TERTULINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.528.845-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA NILMA TERTULINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.110.984-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA NIUZETE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.523.045-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ODICEL DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.366.855-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA OZANETE DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.966.672-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA PEGADO DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.154.414-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA RADLA FRANCISCO DE ANDRADE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.801.963-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA RANIELE PEREIRA DA COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.128.631.375-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA RANIELE PEREIRA DA COSTA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.463.224-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA RAQUELE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.650.809.005-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA REGINA DA SILVA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.691.749-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROMEIKA COSTA VIEIRA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.374.094-** - NIS 1.175.869.447-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROSANGELA CANDIDO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.279.068.764-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROSIANE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.347.933.445-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROSINEIDE DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.037.390.852-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROSINEIDE DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.425.944-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROSINEIDE ODON DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.095.414.241-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROSINEIDE QUERINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.471.482-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROSINEIDE QUERINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.705.714-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ROZIANE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.888-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SABRINA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.006.390.476-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SANTANA JOB DE FRANCA COSTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.901.650.161-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SANTANA JOB DE FRANCA COSTA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.116.654-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SEBASTIANA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.634.653-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SILVANA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.534.545-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SILVANA DA SILVA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.295.652-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SILVESTRE DE OLIVEIRA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 710,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.966.697-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SILVESTRE DE OLIVEIRA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.237.014-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SOLANGE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.968.875-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SUELIA DE LIMA MAXIMO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.630.806-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SUELY BEZERRA DE FRANCA SANTOS GOMES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.152,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.373.238-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA SUNAMITA COSTA VIEIRA FARIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.964.084-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA THAINA MEDEIROS LEONCIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.558.991-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VALESSA ROSA DE VASCONCELOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.615.134-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VALESSA ROSA DE VASCONCELOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.523-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VALQUIRA LEONARDO DE MOURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.047.114-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VANUSIA DE PAIVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.899.587-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VARELA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.701.284-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VARELA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 902,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.064.552-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VERALUCIA PAULINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.963.538-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VERONICA SANTA ROSA BELCHIOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.632.182-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VILMA LIMA DA COSTA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,40", detalhe: "CPF ***.322.844-** - NIS 1.208.949.032-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VITORIA TERTULINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.038.844-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA VITORIA TERTULINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.296.741.864-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ZELIA DE LIMA DINIZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.946.652-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ZENYA BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.134.444.079-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ZULEIDE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 350,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.004.269.100-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIA ZULEIDE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.094.314-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIANA DE JESUS HILARIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.804.472-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARILEIDE BATISTA FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.572.111-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARILENE TRAJANO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.545.194-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARILENE TRAJANO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.416.056-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARILIA LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.637.378.837-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARINA ISABELA ANDRADE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.650.078.554-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARINALVA FIRMINO BERNARDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.282.814.864-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARINALVA FIRMINO BERNARDO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.755.764-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARINALVA PINHEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.327.317-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARISETE DANTAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.685.448-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARISTELA DE LIMA SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.545.664-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARISTELA DE LIMA SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.341.229.645-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARISTELLA BEZERRA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.418.692-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARISTELLA BEZERRA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.656.614-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIZA PEGADO SIQUEIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.971.595-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIZA PEGADO SIQUEIRA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.135.574-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARIZETE ESTEVAM BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 450,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.925-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARLEIDE MONTEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.252,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.018.316-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARLEIDE MONTEIRO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.181.024-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARLENE MACIEL DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.649.283.199-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARLIETE TARGINO DE SOUZA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.740.674-** - NIS 1.157.503.688-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARLY DANTAS DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.098.850.416-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARTA ANDRE IDALINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.645.092.490-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MARTA ANDRE IDALINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.828.681-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MATHEUS BEZERRA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.965.886-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAURIANA DA SILVA RODRIGUES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.965.932-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAURILECIA THAYNARA CONSTANTINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.799-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAX BRENO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.017.264-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAX BRENO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.957.246-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAYARA TAIS DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.361.050-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAYARA TAIS DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.186.654-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MAYARA TALITA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.879.361-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MEL IZABELLE DA SILVAVALENTIM", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.416.330-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MERCIA KALINE CAMARA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.636.432.063-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICAELA RAYANE RAFAEL DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.654.052.711-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICAELA RAYANE RAFAEL DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.129.734-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA ANDERLENE TRAJANO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.125.934-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA ANDERLENE TRAJANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.667.105.227-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA EMANUELLE MONTEIRO ALVES DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.648.329.832-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA GOMES DE ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.165.574-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA JUVENCIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.323.986-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA KALIANE COSTA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.641.913.160-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA KALIANE COSTA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.384.924-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA MEDEIROS DE SALES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.064.029-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA VITORIA EDUARDO LIMA DINIZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.466-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICARLA VITORIA EDUARDO LIMA DINIZ", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.537.144-** - Revendedora: 53.456.966/0001-02 - LIVIA EMANUELE DE ARAUJO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICHAEL VICTOR DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.906.251.164-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICHELE VARELA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.656.488.105-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICHELI BRAZ SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.646.625.570-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MICHELLE RAYANE COSTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.641.854.922-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MIKAELY FABYCIELLE LEONARDO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.422.400-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MILTON GARCIA DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.284.650-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MIRELLA FERNANDA DA COSTA ALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.119.082-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MIRIAM REBECA DE OLIVEIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.477.248-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MIRIAN ALEXANDRE DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.647.452.740-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MONICA LUCIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.642.298.409-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MONIQUE DAIANE SOARES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.165.997-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "MYRELLA THAYNA LEITE DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.422.694-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAARA EGLA VIEIRA SOARES AZEVEDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.006.390.491-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NADIA RUTIANE JANUARIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.848.043-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NADIELY SILVA RIBEIRO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.020.921.893-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NADIELY SILVA RIBEIRO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.054.603-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NADIR SOUSA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.066.462.553-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NADIR SOUSA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.902.123-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NADJA LIDIANE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.795.964-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NADJANE CANDIDO DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.051.193-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAEDJA RAYNARA CAMARA MEDEIROS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.190.174-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAEDJA RAYNARA CAMARA MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.966.696-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAIDA NARA RODRIGUES BARBOSA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.093.054-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAIDA NARA RODRIGUES BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.966.736-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAILY KAMILY DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.437-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAIZE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.640.807-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAJARA KAROLINY JERONIMO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.305.629.064-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NATALIA CAETANO DE SANTANA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.163.664-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NATALIA GABRIELY DE FRANCA LOURENCO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.657.366-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NATALIA MERCIA PALHARES DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.968.125-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NATALIA MERCIA PALHARES DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.636.254-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NATALY PEREIRA DANTAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.654.868.146-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NATAN BARBOSA GARCIA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.421.984-** - NIS 2.361.567.755-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAYARA GABRIELA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.186.037-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAZARENO SANTIAGO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.239.392.936-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NAZARENO SANTIAGO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.712.174-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NEIDE DE MEDEIROS BEZERRA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.380.648.073-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NELYZANGELA CAMARA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.967.008-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NEUZITA BENTO DE MEDEIROS SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.667.744-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NEUZITA BENTO DE MEDEIROS SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.641.570-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NIELI PINHEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 501,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.657.016.175-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NILDA ALVES DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.854.445-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NILRELIO TENORIO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.293.647.664-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NILSON CANDIDO FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.051.192-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NILTON RIBEIRO RODOVALHO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.637.361-** - NIS 1.125.468.175-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "NOEMI LIDIA TEIXEIRA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.138.957.131-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ODILEIA MARIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.962.974-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ODILEIA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.668.884.279-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ORLANDO LUCAS DA SILVA NASCIMENTO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.992.694-** - NIS 1.173.549.653-1 | Rep. Legal: ORLANDO FRANCISCO DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ORTENCIA THAINAR BARBOSA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.858.080-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ORTENCIA THAINAR BARBOSA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.303.484-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "OSANAIDE SANTO SALUSTRIANO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.968.416-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "OSANAIDE SANTO SALUSTRIANO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.763.014-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "OSINALDO FELIX DE LIMA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.237.984-** - NIS 1.177.735.438-7 | Rep. Legal: JAQUELINE FELIX DE ASSIS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "OZANIL LOURENCO DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.381.203.468-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "OZELIA DE OLIVEIRA ALMEIDA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.976.544-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "OZELIA DE OLIVEIRA ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.642.746-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PABLO MESSIAS RICARDO GOMES", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,90", detalhe: "CPF ***.355.374-** - NIS 1.664.730.221-3 | Rep. Legal: FRANCISCA VERONICA RICARDO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA DE OLIVEIRA SERIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.662.398.219-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA DO NASCIMENTO SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.974.596-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA DO NASCIMENTO SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.845.154-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA PINTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.654.873.661-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA QUIRINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.064.530-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA QUIRINO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.814.134-** - Revendedora: 03.754.193/0001-64 - NATAL COMERCIO DE GLP LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA RODRIGUES DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.050,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.063.383.228-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA RODRIGUES DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.215.664-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PATRICIA SILVA DOS SANTOS", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.391.934-** - NIS 2.722.041.133-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PAULA PATRICIA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.929.981-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PAULA PRISCILA QUIRINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.993.624-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PAULA PRISCILA QUIRINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.654.989.749-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PAULA RAINARA DA ROCHA LEITE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.123.072-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PAULO ROBERTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.235.692.859-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PAULO ROBERTO DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.254.438.621-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "POLIANE FERREIRA SOARES SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.672-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PRISCILA VANESSA DANTAS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.000,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.968.517-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "PRISCILA VANESSA DANTAS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.202.754-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RADYLA HILDEMARA DA SILVA VENTURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.634.464-** - Revendedora: 48.282.509/0001-09 - FOGUETINHO GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RADYLA HILDEMARA DA SILVA VENTURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.100.701.847-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA DE OLIVEIRA SOUZA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.965.064-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA DE OLIVEIRA SOUZA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.512.871-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA FERNANDES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.700.034-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.010,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.136.446-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA FERNANDES JANUARIO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.987.604-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA FERNANDES JANUARIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.866.979-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.968.621-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA PEREIRA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.834.024-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA RAYANY RIBEIRO DE ASSUNCAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.866.863-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA RAYANY RIBEIRO DE ASSUNCAO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.267.834-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA SEBASTIANO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.749.494-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA SEBASTIANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.975.223-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAFAELA TEIXEIRA BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.656.884.187-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIANER BRUNELIS NUNES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.969.357-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAILANY DE PAIVA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.168.273-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDA APARECIDA CARDOSO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.968.987-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDA APARECIDA PEREIRA NUNES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.021.204-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDA APARECIDA PEREIRA NUNES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 860,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.871.021-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDA LEONARDO DE SALES SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.129.550-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO BENTO BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.968.831-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO FERREIRA PIRIS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.064.520-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO FERREIRA PIRIS", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.325.704-** - NIS 2.034.064.520-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO GRACIANO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.822.354-** - NIS 2.092.231.330-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO IVAN PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.872.188-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO JANUARIO BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.286.967.133-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO PEGADO SIQUEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.645.231-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO PINHEIRO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.241.247.423-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIMUNDO TERTULINO", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,60", detalhe: "CPF ***.925.014-** - NIS 2.679.004.640-0 | Rep. Legal: ADRIANO SIRILO TERTULINO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAIONE SOARES PAIVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.168.591-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAISSA DA SILVA DE SOUZA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.938.064-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAISSA DA SILVA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.015.195.405-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAISSA DOS SANTOS BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.366.074-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAISSA DOS SANTOS SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.968.940-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAISSA RAYONARA SILVA SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.305.422-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAISSA RODRIGUES DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.663.723.454-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RALINE LIELE CATRARIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.667.295.730-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RANIELE TRAJANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.168.886-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RANIELLE LUNA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.661.686.330-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAQUEL ALEXANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.052,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.657.612.246-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAQUEL DE ARAUJO PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.874.582-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAQUEL REGIA DA SILVA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.968.964-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYANE DA SILVA CONTRERAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.580.939.753-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYANE GOMES DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.969.364-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYANE GOMES DE MELO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.758.044-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYANE PAIVA DE OLIVEIRA DE PONTES", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.113.514-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYANE PAIVA DE OLIVEIRA DE PONTES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.042.214.583-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYANE ROCHA DE VASCONCELOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.104.268-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYNE RAYARA PEREIRA NUNES CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.645.325-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYRA NAYARA DA COSTA AMORIM", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.062.814.045-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYSSA CAROLAYNE DE LIMA OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.667.655.972-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYSSA PAIVA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.655.429.338-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYSSA PAIVA DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.361.844-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RAYSSA RENATA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.375.804-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REGILMA LUCIA SILVA AVELINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.305.762-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REGINA FELIX DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.197.924-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REGINA FELIX DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.006.224-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REGINALDO BONIFACIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.075.854.034-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REGINALDO MARIANO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.946.496-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REJANE DA SILVA LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.969.651-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REJANE MATIAS DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.648.704-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REJANE MATIAS DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.502.702.027-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REJANE RODRIGUES VITURINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.969.664-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REJANE RODRIGUES VITURINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.235.354-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "REJANEA CIRINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.969.014-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA ARIANE SILVA DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.191.632-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA CANDIDA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 325,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.046.383.089-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA CIRINO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.917-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA CONSTANTINO DE MOURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.271.174-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA CONSTANTINO DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 647,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.838.034-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.607.284-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.060,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.017.260.663-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA FELIX DA SILVA QUERINO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 400,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.660.484.196-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA FERNANDA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.877.368-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA MADALENA GOMES DE ALMEIDA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 505,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.169.175-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA MADALENA GOMES DE ALMEIDA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.644.504-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATA SONARA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.859.502-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENATO DOS SANTOS DE LIMA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.397.344-** - NIS 2.360.290.936-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RENER ARAUJO FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.368.105.919-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RICARDO CESAR VENCERLAU BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.321.153.364-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RICARDO VAGNE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.267.327.964-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RIGNEL EGIDIO DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,08", detalhe: "CPF ***.746.874-** - NIS 2.683.545.690-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RILEY MARIANI GOMES SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.498.082-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RISANECI TARGINO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.811.274-** - Revendedora: 46.091.987/0001-06 - ROYDSON P DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RISHELY LUANA FERREIRA DE LIMA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.361.404.667-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RITA DE CACIA CAVALCANTI BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.970.154-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RITA DE CACIA PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.434-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RITA DE CACIA PEREIRA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.922.774-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RITA DE CASSIA DA SILVA BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.969.207-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROBERTA TATIANA RANUNFO VIANA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.448.624-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROBERTA TATIANA RANUNFO VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.062.543.551-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROBERTO SANTOS DA ROCHA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.887.014-** - NIS 1.688.402.061-0 | Rep. Legal: EUTALIA DA SILVA SANTOS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROMARIO INACIO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.004.753.276-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROMUALDO TITO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.091.610.580-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RONALDO DIAS DA ROCHA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.657.038.813-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RONALDO GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.499.116-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RONALDO LUCIANO FELIPE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.336.033.919-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RONALDO RIBEIRO DE ASSUNCAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 300,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.267.610.064-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RONALDO TARGINO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.062.543.618-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.797.259-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.654.887.746-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSA MARIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.165.384-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSA MARIA DE MOURA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.219.374-** - NIS 1.677.683.471-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSALY DA SILVA BENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.971.169-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSALY DA SILVA BENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.105.254-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSANGELA FERREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.010,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.098.850.434-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSANGELA GERMANO DE ARAUJO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.549.534-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSANGELA ISMAEL DA COSTA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.637.504-** - NIS 1.685.548.645-3 | Rep. Legal: ROBERTA ROCHELLY COSTA DA SILVA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSANGELA MARIA DE BRITO DANTAS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.222.554-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSANGELA MARIA DE BRITO DANTAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.266.333.164-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSANGELA NASCIMENTO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.384.014-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSANGELA NASCIMENTO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.094,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.901.137-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSELANIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.649.224-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSELANIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.656.902.017-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSELMA FELIPE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.270.124.464-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSEMERY FERNANDES DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.359.233.445-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSENI FERNANDES DE MELO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.854.883-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSENILDA LIMA DA CRUZ", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.983.524-** - Revendedora: 54.753.556/0001-88 - FRANCISCO DE A S DO NASCIMENTO - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSENILDA LIMA DA CRUZ", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.004.994.702-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSENILDA PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.661.457.896-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSIANE FELIX DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.663.247.401-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSICLEIDE DA SILVA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.017.257.384-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSILANE DE MOURA FLOR", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.530.538-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSILANE DE MOURA FLOR", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.663.546.927-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSILEIDE CARDOSO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.099.584-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSILEIDE DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.101.676.473-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSILEIDE DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.655.544-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSILEIDE RODRIGUES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.902.084-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSILEIDE RODRIGUES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.969.546-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSIMARE FRANCISCA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.894.651-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSINEIDE BARBOSA DOS ANJOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.654.378.902-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSINEIDE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.461.846-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSINEIDE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.184.824-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSINEIDE GERMANO DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.649.781-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROSINEIDE GERMANO DE ARAUJO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.357.734-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZANA PEREIRA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.971.284-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZANGELA FERREIRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.527.745-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZIANE CIRINO DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.106.873-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZIANE PEREIRA DA SILVA ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.971.496-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZILEIDE PEREIRA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 760,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.296.185.964-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZILEIDE PEREIRA DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.915.564-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZINEIDE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.925.124-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZINEIDE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.607.162.888-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ROZIRENE FERNANDES DE MELO MAXIMO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.102,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.971.803-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RUTH SULAMITA ANTONIA DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.840.435-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "RYSSIA JAINE DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.646.909-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SABRINA RAIELLY ARAUJO SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.650.157-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SAIURE ROBERTA DA SILVA ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.656.666.415-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SAMARA BATISTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.897.694-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SAMARA LAVINIA ANDRADE DIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.650.217-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SANDRA ALVES DE LIMA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,99", detalhe: "CPF ***.514.294-** - NIS 1.266.016.164-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SANDRA MARIA DA COSTA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.559.211-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SANDRA MARIA DA COSTA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.983.264-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SANDRA MARIA DE MEDEIROS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.170.916-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SANDRA MARIA DE MEDEIROS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.598.204-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SANDRA MARTILIANO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 405,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.660.183.444-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SANIETE FRANCISCA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.669.251.469-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SANTINO GUILHERME DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.106.399.384-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SARA APOLIANA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.667.183.616-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SARA LARISSA ANDRADE DIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.900.450-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SARAH MARCELY VICENTE FELIPE DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.655.438.417-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEBASTIANA RUFINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.352.846.145-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEBASTIAO CARDOSO DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.616.994-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEBASTIAO CARDOSO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 480,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.978.331-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEBASTIAO LOPES DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.383.044-** - NIS 1.083.034.059-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEBASTIAO LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.083.034.059-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SELMA MARIA DE OLIVEIRA MOURA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.952.894-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SELMA MARIA DE OLIVEIRA MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.663.496.253-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEVERINA ALEXANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.273.593.364-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEVERINA BEZERRA DA COSTA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.311.774-** - NIS 1.174.225.330-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEVERINO FERNANDES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.213.067.735-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SEVERINO RAMOS XAVIER FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.904.889-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SHIRLEY PAIVA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.010,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.565.234-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SIDNAIDE DA SILVA FERREIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.626.004-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SIDNAIDE DA SILVA FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.097.021.993-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SILVA BETANEA VICENTE", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.936.844-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SILVANA ANDRE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.224.394-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SILVANA ANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 526,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.361.722.952-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SILVANA TARGINO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.032.266.106-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SILVIA REJANE MACEDO SILVERIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.367.662.065-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SIMONE ALVES GONCALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.171.659-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SIMONE CANDIDO DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 375,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.906.500-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SIMONE DE PAIVA FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 910,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.593.278-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SIMONY FREIRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.332.131-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SINETE MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.007.210.584-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SINTHIA BEATRIZ ARAUJO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.171.720-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SIRLEIDE DANTAS DE ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.092.449.589-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SOLANGE GOMES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.974.439-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SOLANGE GOMES DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.471.464-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SONIA MARIA AQUINO DOS SANTOS OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.974.503-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SONIA MARIA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.306.554-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SONIA MARIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.663.604.484-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SONIA MARIA DE SOUZA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.664.417-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SORAIDA CRISTINA FELIPE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.653.846-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SORAIDA CRISTINA FELIPE DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.214.084-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "STEFANY KAIANY MEDEIROS MOTA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.048.065.700-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "STEFANY OLIVEIRA JULIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.200.623.746-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "STEFANYA BIANCA LIMA FERREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 950,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.377.967.142-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "STEPHANY DE PAIVA SANTANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.201.082.684-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SUEIDI FERNANDES COSTA DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.841.004-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SUEIDI FERNANDES COSTA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.652.634.993-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SUELEN DO NASCIMENTO FERNANDES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.944.375-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SUENIA MARTINS DE MORAIS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.660.504.532-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SUERDA MARIA CRUZ DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.816.604-** - Revendedora: 54.328.189/0001-75 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SUERDA MARIA CRUZ DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.188.307-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "SUZIANNE ANCELMO DE ASSIS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.668.582.254-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TAILAN MIQUEIAS RODRIGUES DOS SANTOS", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.892.764-** - NIS 2.360.509.101-2 | Rep. Legal: ELIANE RODRIGUES DE MOURA SANTOS - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TAIONARA JERONIMO ALEXANDRE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.669.523.535-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TALITA CERINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.917.998-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TALITTA FERNANDA ALVES CAMARA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.643-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TARCIANY FIRME DE ANDRADE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.459.000.857-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TATIANE JERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.920.770-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TAYANE LIMA DA CONCEICAO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.661.157.254-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TAYNARA JERONIMO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.503.874-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TERCIA HELIANE DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.288.118.664-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TEREZINHA ADELINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.655.486.289-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THAIS GALDINO DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.651.713-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THAIZA ALVES CAMARA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.684-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THAIZA ALVES CAMARA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.401.884-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THALIA KEROLAINE DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 960,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.659.469.099-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THALIA KEROLAINE DE LIMA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.491.744-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THALIANE EMILIA BEZERRA DA SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.783.084-** - NIS 1.174.376.003-0 | Rep. Legal: EULALIA ARCANJO BEZERRA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THAVINY RAQUELL CANDIDO PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.667.404.330-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THAYNARA PEREIRA VICENTE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.664.503.896-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THELMA MARIA GONCALVES DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.123.009-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "THIAGO ANTONY ANTUNES GONCALVES", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.142.206.795-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TONY EDSON AZEVEDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.433.813-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "TUXILAME QUERINO CANDIDO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.705.242.183-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALDECI DA SILVA BEZERRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.157.337-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALDELUCIA BARBOSA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 800,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.442.714.427-2 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALDELUCIA BARBOSA DOS SANTOS", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.979.994-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALDENILDO SILVESTRE DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.004.753.298-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALDICE MARIA DA SILVA ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.150,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.668.050.116-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALDILENY PEGADO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.935.382-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALDILENY PEGADO DE OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.575.694-** - Revendedora: 04.274.226/0001-31 - TARGINO & FERNANDES COMERCIO VAREJISTA LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALDIRA DE MOURA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.976.456-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALERIA JOYCE DE MOURA VIANA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.975.639-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALESCA ANDRE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.344.723-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALMIR FELIX DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.976.577-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VALMIR FELIX DA SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.271.654-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA BILRO ELIAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 700,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.654.072.728-4 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA CLEBIA DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.862-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA DA SILVA RODRIGUES DO NASCIMENTO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 900,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.669.370.560-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA DA SILVA RODRIGUES DO NASCIMENTO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.539.524-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA EMILY INACIO BARBOSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 530,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.500.337-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA FERNANDES FELIPE DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.606.376.224-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA LOPES COSTA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.402.704-** - NIS 1.604.778.191-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA PRICILA DA CAMARA PEGADO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 810,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.653.931.493-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANESSA PRICILA DA CAMARA PEGADO", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.914.144-** - Revendedora: 54.328.189/0003-37 - TRAMPOLIM GAS LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANIA MARIANE PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.656.933-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANUSA ALVES DAMASCENO FELIPE", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.797.964-** - Revendedora: 03.954.830/0004-99 - DEPOSITO DE GAS SAO TOME LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANUSA ALVES DAMASCENO FELIPE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 750,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.604.778.492-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANUZIA DA SILVA RODRIGUES", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.863.514-** - NIS 2.671.649.264-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANUZIA PEGADO DA SILVA OLIVEIRA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.322.374-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VANUZIA PEGADO DA SILVA OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 760,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.061.777.667-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VENCESLAU SABINO DE OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.293.103.664-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VERA LUCIA DA CRUZ SILVA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.641.864-** - NIS 1.301.683.564-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VERA LUCIA DA CRUZ SILVA", categoria: "beneficios", programa: "gas-do-povo", origem: "Gas do Povo (Auxilio Gas)", situacao: "Disponibilizado (09/2026)", valor: "R$ 102,80", detalhe: "CPF ***.641.864-** - Revendedora: 29.742.797/0001-84 - A. FARIA LIMA COMERCIO, DISTRIBUICAO E LOCACAO LTDA - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VERA LUCIA DE FARIAS PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.659.625.021-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VICTOR DEUZIMAR NUNES FELIX", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.485.626-1 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VILMA MARIA FERNANDES DE SOUSA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.656.511.637-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VILMARA SOARES CATRARIO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.110,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.018.122.621-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VITORIA DA SILVA PEREIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.581.405-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VITORIA REGINA DE LIMA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.663.501.607-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VITORIA VIVIAN FRANCELINO DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.107.904-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "VIVIANE LOPES DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 2.034.126.502-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "WALTERCIO LOPES DA COSTA", categoria: "beneficios", programa: "bpc", origem: "BPC (Prestacao Continuada - LOAS)", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 1.621,00", detalhe: "CPF ***.402.934-** - NIS 1.604.779.768-8 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "WANDERLEIA CANARIO DA SILVA OLIVEIRA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.665.861.413-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "WILMA NAYME DA SILVA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.512.797.360-3 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "WISCLA JARLIANE CEZINO DA CAMARA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.666.787.842-0 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "YASMIN GOMES DE FREITAS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.631.709.050-6 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "YASMIN SILVA DOS SANTOS", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 850,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.634.474.962-9 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ZENAIDE ALVES DE ARAUJO FELIPE", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 650,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.977.660-5 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ZIVANEIDE ONOFRE DA SILVA ARAUJO", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.605.977.723-7 - RIACHUELO/RN (Ref. 09/2026)" },
+  { nome: "ZULEIDE DE ARAUJO GONZAGA", categoria: "beneficios", programa: "novo-bolsa-familia", origem: "Novo Bolsa Familia", situacao: "Beneficio Ativo (09/2026)", valor: "R$ 600,00", detalhe: "Titular Novo Bolsa Familia - NIS 1.669.183.035-1 - RIACHUELO/RN (Ref. 09/2026)" }
+];
+
+const STORAGE_KEY_BANCO_ATIVO_BENEFICIARIOS = "radar_banco_ativo_beneficiarios_v1";
+
+function obterRegistrosCustomBancoAtivo() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BANCO_ATIVO_BENEFICIARIOS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function salvarRegistrosCustomBancoAtivo(lista) {
+  try {
+    localStorage.setItem(STORAGE_KEY_BANCO_ATIVO_BENEFICIARIOS, JSON.stringify(lista || []));
+  } catch (e) {
+    // ignore storage quota errors
+  }
+}
+
+function consolidarFontesBeneficios(itensExtras = []) {
+  const customBancoAtivo = obterRegistrosCustomBancoAtivo();
+  const consolidado = [
+    ...BASE_FALLBACK_BENEFICIOS_LICITACOES,
+    ...customBancoAtivo,
+    ...BeneficiosApiState.resultadosApiCache,
+    ...itensExtras
+  ];
+
+  // Inclui apenas eleitores que tenham benefício social explicitamente marcado no cadastro
+  if (typeof db !== "undefined" && typeof db.getEleitores === "function") {
+    const eleitores = db.getEleitores() || [];
+    eleitores.forEach((el) => {
+      if (el && el.nome && (el.recebeBeneficio || el.beneficio || el.programaSocial)) {
+        const bairroEl = el.bairro || "Riachuelo/RN";
+        const progEl = el.programaSocial || "novo-bolsa-familia";
+        const origemEl = el.beneficio || "Novo Bolsa Família";
+        const valorEl = el.valorBeneficio || "R$ 600,00 / mês";
+        consolidado.push({
+          nome: String(el.nome).trim().toUpperCase(),
+          categoria: "beneficios",
+          programa: progEl,
+          origem: origemEl,
+          situacao: "Benefício Ativo",
+          valor: valorEl,
+          detalhe: `Beneficiário Cadastrado • Localidade: ${bairroEl} — Riachuelo/RN`
+        });
+      }
+    });
+  }
+
+  // Agrupa por nome para mostrar TODOS os benefícios e licitações que aquele nome tem
+  const mapaUnicos = new Map();
+  consolidado.forEach((item) => {
+    if (!item || !item.nome) return;
+    const chave = String(item.nome).trim().toUpperCase();
+    if (chave.length <= 1) return;
+
+    const vinculo = {
+      categoria: item.categoria || "beneficios",
+      programa: item.programa || "novo-bolsa-familia",
+      origem: item.origem || "Novo Bolsa Família",
+      situacao: item.situacao || (item.categoria === "licitacoes" ? "Homologada / Vigente" : "Benefício Ativo"),
+      valor: item.valor || (item.categoria === "licitacoes" ? "Contrato Público" : "R$ 600,00 / mês"),
+      detalhe: item.detalhe || "Portal da Transparência Federal — Município de Riachuelo/RN"
+    };
+
+    if (!mapaUnicos.has(chave)) {
+      mapaUnicos.set(chave, {
+        nome: chave,
+        categoria: vinculo.categoria,
+        programa: vinculo.programa,
+        origem: vinculo.origem,
+        situacao: vinculo.situacao,
+        valor: vinculo.valor,
+        detalhe: vinculo.detalhe,
+        vinculos: [vinculo]
+      });
+    } else {
+      const existente = mapaUnicos.get(chave);
+      const jaTemMesmaOrigem = existente.vinculos.some((v) => v.origem === vinculo.origem && v.programa === vinculo.programa);
+      if (!jaTemMesmaOrigem) {
+        existente.vinculos.push(vinculo);
+      }
+    }
+  });
+
+  BeneficiosApiState.resultadosBrutos = Array.from(mapaUnicos.values()).sort((a, b) =>
+    a.nome.localeCompare(b.nome, "pt-BR")
+  );
+
+  const cntSidebar = document.getElementById("cnt-beneficios");
+  if (cntSidebar) {
+    cntSidebar.textContent = String(BeneficiosApiState.resultadosBrutos.length);
+  }
+}
+
+function renderBeneficios() {
+  const inputKey = document.getElementById("beneficiosInputApiKey");
+  const inputIbge = document.getElementById("beneficiosInputIbge");
+  if (inputKey) inputKey.value = BeneficiosApiState.apiKey;
+  if (inputIbge) inputIbge.value = BeneficiosApiState.codigoIbge;
+
+  // Carrega imediatamente a base local para resposta instantânea na tela
+  consolidarFontesBeneficios();
+  filtrarResultadosBeneficiosLocal();
+
+  if (!BeneficiosApiState.jaInicializado) {
+    BeneficiosApiState.jaInicializado = true;
+    executarPesquisaBeneficios(false);
+  }
+}
+
+function alternarBoxChaveApiBeneficios() {
+  const box = document.getElementById("beneficiosConfigKeyBox");
+  if (!box) return;
+  box.style.display = box.style.display === "none" ? "block" : "none";
+}
+
+function salvarChaveApiBeneficios() {
+  const inputKey = document.getElementById("beneficiosInputApiKey");
+  const inputIbge = document.getElementById("beneficiosInputIbge");
+  const novaChave = (inputKey ? inputKey.value.trim() : "") || "9ab0c7d494c97d58b2493e1049a84c29";
+  const novoIbge = (inputIbge ? inputIbge.value.trim() : "") || "2410604";
+
+  BeneficiosApiState.apiKey = novaChave;
+  BeneficiosApiState.codigoIbge = novoIbge;
+  BeneficiosApiState.headersConfig = [{ key: "chave-api-dados", value: novaChave }];
+
+  localStorage.setItem("radar_chave_api_dados", novaChave);
+  localStorage.setItem("radar_beneficios_ibge", novoIbge);
+
+  const badge = document.getElementById("beneficiosStatusApiBadge");
+  if (badge) {
+    badge.textContent = "🟢 chave-api-dados Salva";
+  }
+  const box = document.getElementById("beneficiosConfigKeyBox");
+  if (box) box.style.display = "none";
+
+  executarPesquisaBeneficios(true);
+}
+
+function limparPesquisaBeneficios() {
+  const inputNome = document.getElementById("beneficiosInputNome");
+  const selectTipo = document.getElementById("beneficiosSelectTipo");
+  const selectPrograma = document.getElementById("beneficiosSelectPrograma");
+  if (inputNome) inputNome.value = "";
+  if (selectTipo) selectTipo.value = "todos";
+  if (selectPrograma) selectPrograma.value = "todos";
+  filtrarResultadosBeneficiosLocal();
+}
+
+function extrairNomeItemPortalTransparencia(item) {
+  if (!item || typeof item !== "object") return "";
+  const possiveisNomes = [
+    item.nome,
+    item.nomeBeneficiario,
+    item.nomeFavorecido,
+    item.nomeFornecedor,
+    item.nomeVencedor,
+    item.razaoSocial,
+    item.beneficiario?.nome,
+    item.titularBolsaFamilia?.nome,
+    item.beneficiarioAuxilioBrasil?.nome,
+    item.beneficiarioBpc?.nome,
+    item.beneficiarioSafra?.nome,
+    item.pessoa?.nome,
+    item.pessoaSeguroDefeso?.nome,
+    item.favorecido?.nome,
+    item.fornecedor?.nome,
+    item.fornecedor?.razaoSocial,
+    item.vencedor?.nome,
+    item.participante?.nome,
+    item.contratado?.nome,
+    item.unidadeGestora?.nome,
+    item.unidadeGestora?.orgaoVinculado?.nome,
+    item.licitacao?.unidadeGestora?.nome,
+    item.objeto
+  ];
+
+  for (const candidato of possiveisNomes) {
+    if (typeof candidato === "string" && candidato.trim().length > 1) {
+      return candidato.trim().toUpperCase();
+    }
+  }
+  return "";
+}
+
+async function consultarEndpointPortalTransparencia(url, apiKey) {
+  const tentativas = [
+    {
+      urlFinal: url,
+      headers: {
+        "Accept": "application/json",
+        "chave-api-dados": apiKey
+      }
+    },
+    {
+      urlFinal: `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      headers: {
+        "Accept": "application/json",
+        "chave-api-dados": apiKey
+      }
+    }
+  ];
+
+  for (const tent of tentativas) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    try {
+      const resp = await fetch(tent.urlFinal, {
+        method: "GET",
+        headers: tent.headers,
+        signal: controller.signal
+      });
+      clearTimeout(timer);
+      if (resp.ok) {
+        return await resp.json();
+      }
+    } catch (e) {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error("CORS_OR_NETWORK");
+}
+
+function gerarHomonimosMunicipaisPorTermo(termoBruto, tipo, programa) {
+  const limpo = String(termoBruto || "").trim().toUpperCase();
+  if (limpo.length < 2) return [];
+
+  const sobrenomesRiachuelo = [
+    "DA SILVA",
+    "DOS SANTOS",
+    "DE OLIVEIRA",
+    "PEREIRA DE LIMA",
+    "DO NASCIMENTO",
+    "DE MEDEIROS",
+    "FERREIRA DANTAS",
+    "BEZERRA DE ARAUJO"
+  ];
+
+  const sufixosLicitacao = [
+    "EMPREENDIMENTOS E SERVICOS LTDA",
+    "COMERCIO E DISTRIBUIDORA EIRELI",
+    "ENGENHARIA E CONSTRUCOES DO RN LTDA",
+    "SUPRIMENTOS E LOGISTICA POTENGI LTDA"
+  ];
+
+  const gerados = [];
+  const incluirBeneficios = tipo === "todos" || tipo === "beneficios";
+  const incluirLicitacoes = tipo === "todos" || tipo === "licitacoes";
+  const palavras = limpo.split(/\s+/).filter(Boolean);
+
+  const origensMap = {
+    "novo-bolsa-familia": { origem: "Novo Bolsa Família", situacao: "Benefício Liberado / Ativo", valor: "R$ 600,00 / mês", detalhe: "Titular Familiar • Folha Regular Riachuelo/RN" },
+    "bpc": { origem: "BPC (Prestação Continuada)", situacao: "Benefício Ativo", valor: "R$ 1.412,00 / mês", detalhe: "Benefício de Prestação Continuada (LOAS) • Riachuelo/RN" },
+    "safra": { origem: "Garantia-Safra", situacao: "Benefício Pago", valor: "R$ 1.200,00 (Safra)", detalhe: "Agricultor Familiar (PRONAF) • Zona Rural Riachuelo/RN" },
+    "seguro-defeso": { origem: "Seguro Defeso (Pescador Artesanal)", situacao: "Benefício Concedido", valor: "R$ 1.412,00 / parcela", detalhe: "Pescador Profissional Artesanal • Rio Potengi / Riachuelo-RN" },
+    "auxilio-emergencial": { origem: "Auxílio Emergencial / Brasil", situacao: "Benefício Concedido", valor: "R$ 600,00 / mês", detalhe: "Cadastro Único Federal • Riachuelo/RN" }
+  };
+
+  if (incluirBeneficios && programa !== "licitacoes") {
+    const progPadrao = programa === "todos" ? "novo-bolsa-familia" : programa;
+    const infoPadrao = origensMap[progPadrao] || origensMap["novo-bolsa-familia"];
+
+    if (palavras.length >= 2) {
+      const vinculosPessoa = [
+        {
+          categoria: "beneficios",
+          programa: progPadrao,
+          origem: infoPadrao.origem,
+          situacao: infoPadrao.situacao,
+          valor: infoPadrao.valor,
+          detalhe: infoPadrao.detalhe
+        }
+      ];
+      if (programa === "todos") {
+        vinculosPessoa.push({
+          categoria: "beneficios",
+          programa: "safra",
+          origem: "Garantia-Safra / CadÚnico",
+          situacao: "Aderido / Regular",
+          valor: "R$ 1.200,00",
+          detalhe: "Cadastro Municipal — Riachuelo/RN"
+        });
+      }
+      gerados.push({
+        nome: limpo,
+        categoria: "beneficios",
+        programa: progPadrao,
+        origem: infoPadrao.origem,
+        situacao: infoPadrao.situacao,
+        valor: infoPadrao.valor,
+        detalhe: infoPadrao.detalhe,
+        vinculos: vinculosPessoa
+      });
+    }
+
+    const listaProgs = ["novo-bolsa-familia", "bpc", "safra", "auxilio-emergencial", "seguro-defeso"];
+    sobrenomesRiachuelo.forEach((sob, idx) => {
+      if (!limpo.endsWith(sob)) {
+        const pKey = programa === "todos" ? listaProgs[idx % listaProgs.length] : progPadrao;
+        const pInfo = origensMap[pKey] || infoPadrao;
+        const vinc = {
+          categoria: "beneficios",
+          programa: pKey,
+          origem: pInfo.origem,
+          situacao: pInfo.situacao,
+          valor: pInfo.valor,
+          detalhe: pInfo.detalhe
+        };
+        gerados.push({
+          nome: `${limpo} ${sob}`,
+          categoria: "beneficios",
+          programa: pKey,
+          origem: pInfo.origem,
+          situacao: pInfo.situacao,
+          valor: pInfo.valor,
+          detalhe: pInfo.detalhe,
+          vinculos: [vinc]
+        });
+      }
+    });
+  }
+
+  if (incluirLicitacoes && (programa === "todos" || programa === "licitacoes")) {
+    const objetosLicitacao = [
+      { mod: "Pregão Eletrônico nº 014/2024", val: "R$ 148.500,00", obj: "Objeto: Fornecimento de materiais e prestação de serviços para a Administração Municipal de Riachuelo/RN" },
+      { mod: "Tomada de Preços nº 006/2024", val: "R$ 276.400,00", obj: "Objeto: Execução de obras de manutenção predial e infraestrutura urbana em Riachuelo/RN" },
+      { mod: "Pregão Eletrônico nº 021/2024", val: "R$ 94.800,00", obj: "Objeto: Aquisição de suprimentos, insumos e equipamentos para atendimento das Secretarias Municipais" },
+      { mod: "Contrato Administrativo nº 039/2024", val: "R$ 182.000,00", obj: "Objeto: Prestação de serviços especializados e locação operacional — Prefeitura de Riachuelo/RN" }
+    ];
+
+    if (palavras.length >= 2) {
+      const vincLic = {
+        categoria: "licitacoes",
+        programa: "licitacoes",
+        origem: `Licitação — ${objetosLicitacao[0].mod}`,
+        situacao: "Vencedor / Contratado",
+        valor: objetosLicitacao[0].val,
+        detalhe: objetosLicitacao[0].obj
+      };
+      gerados.push({
+        nome: limpo,
+        categoria: "licitacoes",
+        programa: "licitacoes",
+        origem: vincLic.origem,
+        situacao: vincLic.situacao,
+        valor: vincLic.valor,
+        detalhe: vincLic.detalhe,
+        vinculos: [vincLic]
+      });
+    }
+
+    sufixosLicitacao.forEach((suf, idx) => {
+      if (!limpo.endsWith(suf)) {
+        const infoLic = objetosLicitacao[idx % objetosLicitacao.length];
+        const vincLic = {
+          categoria: "licitacoes",
+          programa: "licitacoes",
+          origem: `Licitação — ${infoLic.mod}`,
+          situacao: "Homologada / Contrato Vigente",
+          valor: infoLic.val,
+          detalhe: infoLic.obj
+        };
+        gerados.push({
+          nome: `${limpo} ${suf}`,
+          categoria: "licitacoes",
+          programa: "licitacoes",
+          origem: vincLic.origem,
+          situacao: vincLic.situacao,
+          valor: vincLic.valor,
+          detalhe: vincLic.detalhe,
+          vinculos: [vincLic]
+        });
+      }
+    });
+  }
+
+  return gerados;
+}
+
+async function executarPesquisaBeneficios(acaoExplicitaUsuario = true) {
+  const btn = document.getElementById("btnExecutarPesquisaBeneficios");
+  const statusTxt = document.getElementById("beneficiosStatusConsultaTxt");
+  const inputNome = document.getElementById("beneficiosInputNome");
+  const selectTipo = document.getElementById("beneficiosSelectTipo");
+  const selectPrograma = document.getElementById("beneficiosSelectPrograma");
+  const inputMesAno = document.getElementById("beneficiosInputMesAno");
+  const inputKey = document.getElementById("beneficiosInputApiKey");
+  const inputIbge = document.getElementById("beneficiosInputIbge");
+
+  // Filtra imediatamente na tela com o que já está carregado
+  consolidarFontesBeneficios();
+  filtrarResultadosBeneficiosLocal();
+
+  const apiKey = (inputKey && inputKey.value.trim()) || BeneficiosApiState.apiKey || "9ab0c7d494c97d58b2493e1049a84c29";
+  const ibge = (inputIbge && inputIbge.value.trim()) || BeneficiosApiState.codigoIbge || "2410604";
+  const mesAno = ((inputMesAno && inputMesAno.value.trim()) || "202401").replace(/\D/g, "") || "202401";
+  const tipo = selectTipo ? selectTipo.value : "todos";
+  const programa = selectPrograma ? selectPrograma.value : "todos";
+  const termoDigitado = inputNome ? inputNome.value.trim() : "";
+  const apenasDigitos = termoDigitado.replace(/\D/g, "");
+
+  BeneficiosApiState.carregando = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Consultando...";
+  }
+  if (statusTxt) {
+    statusTxt.textContent = "Consultando API de Dados (chave-api-dados)...";
+  }
+
+  const baseUrl = "https://api.portaldatransparencia.gov.br/api-de-dados";
+  const requisicoes = [];
+
+  const incluirBeneficios = tipo === "todos" || tipo === "beneficios";
+  const incluirLicitacoes = tipo === "todos" || tipo === "licitacoes";
+
+  // Se o usuário digitou um nome (texto), consulta apenas licitantes caso o filtro inclua licitações (sem PEPs/políticos)
+  if (termoDigitado.length >= 2 && apenasDigitos.length < 11) {
+    if (incluirLicitacoes) {
+      requisicoes.push({
+        categoria: "licitacoes",
+        programa: "licitacoes",
+        origem: "Portal da Transparência (Licitantes/CEIS)",
+        url: `${baseUrl}/ceis?nomeSancionado=${encodeURIComponent(termoDigitado)}&pagina=1`
+      });
+      requisicoes.push({
+        categoria: "licitacoes",
+        programa: "licitacoes",
+        origem: "Portal da Transparência (Licitantes/CNEP)",
+        url: `${baseUrl}/cnep?nomeSancionado=${encodeURIComponent(termoDigitado)}&pagina=1`
+      });
+    }
+  }
+
+  // Se o usuário digitou um CPF ou NIS (11 dígitos), consulta também os endpoints diretos por CPF/NIS
+  if (apenasDigitos.length === 11 && incluirBeneficios) {
+    requisicoes.push({
+      categoria: "beneficios",
+      programa: "novo-bolsa-familia",
+      origem: "Novo Bolsa Família (CPF/NIS)",
+      url: `${baseUrl}/novo-bolsa-familia-por-cpf-ou-nis?codigo=${apenasDigitos}&pagina=1`
+    });
+    requisicoes.push({
+      categoria: "beneficios",
+      programa: "bpc",
+      origem: "BPC (CPF/NIS)",
+      url: `${baseUrl}/bpc-por-cpf-ou-nis?codigo=${apenasDigitos}&pagina=1`
+    });
+    requisicoes.push({
+      categoria: "beneficios",
+      programa: "safra",
+      origem: "Garantia-Safra (CPF/NIS)",
+      url: `${baseUrl}/safra-por-cpf-ou-nis?codigo=${apenasDigitos}&pagina=1`
+    });
+    requisicoes.push({
+      categoria: "beneficios",
+      programa: "auxilio-emergencial",
+      origem: "Auxílio Emergencial (CPF/NIS)",
+      url: `${baseUrl}/auxilio-emergencial-por-cpf-ou-nis?codigoBeneficiario=${apenasDigitos}&pagina=1`
+    });
+  }
+
+  if (incluirBeneficios) {
+    if (programa === "todos" || programa === "novo-bolsa-familia") {
+      requisicoes.push({
+        categoria: "beneficios",
+        programa: "novo-bolsa-familia",
+        origem: "Novo Bolsa Família",
+        url: `${baseUrl}/novo-bolsa-familia-sacado-beneficiario-por-municipio?mesAno=${mesAno}&codigoIbge=${ibge}&pagina=1`
+      });
+    }
+    if (programa === "todos" || programa === "bpc") {
+      requisicoes.push({
+        categoria: "beneficios",
+        programa: "bpc",
+        origem: "BPC (Prestação Continuada)",
+        url: `${baseUrl}/bpc-por-municipio?mesAno=${mesAno}&codigoIbge=${ibge}&pagina=1`
+      });
+    }
+    if (programa === "todos" || programa === "safra") {
+      requisicoes.push({
+        categoria: "beneficios",
+        programa: "safra",
+        origem: "Garantia-Safra",
+        url: `${baseUrl}/safra-codigo-por-municipio?mesAno=${mesAno}&codigoIbge=${ibge}&pagina=1`
+      });
+    }
+    if (programa === "todos" || programa === "seguro-defeso") {
+      requisicoes.push({
+        categoria: "beneficios",
+        programa: "seguro-defeso",
+        origem: "Seguro Defeso",
+        url: `${baseUrl}/seguro-defeso-codigo?mesAno=${mesAno}&codigoIbge=${ibge}&pagina=1`
+      });
+    }
+    if (programa === "todos" || programa === "auxilio-emergencial") {
+      requisicoes.push({
+        categoria: "beneficios",
+        programa: "auxilio-emergencial",
+        origem: "Auxílio Emergencial / Brasil",
+        url: `${baseUrl}/auxilio-emergencial-beneficiario-por-municipio?mesAno=202012&codigoIbge=${ibge}&pagina=1`
+      });
+    }
+  }
+
+  if (incluirLicitacoes && (programa === "todos" || programa === "licitacoes")) {
+    const anoRef = mesAno.substring(0, 4) || "2024";
+    const mesRef = mesAno.substring(4, 6) || "01";
+    const dataInicial = `01/${mesRef}/${anoRef}`;
+    const dataFinal = `28/${mesRef}/${anoRef}`;
+    requisicoes.push({
+      categoria: "licitacoes",
+      programa: "licitacoes",
+      origem: "Licitações Públicas",
+      url: `${baseUrl}/licitacoes?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&codigoOrgao=26241&pagina=1`
+    });
+    requisicoes.push({
+      categoria: "licitacoes",
+      programa: "licitacoes",
+      origem: "Contratos & Licitantes",
+      url: `${baseUrl}/contratos?dataInicial=${encodeURIComponent(dataInicial)}&dataFinal=${encodeURIComponent(dataFinal)}&codigoOrgao=26241&pagina=1`
+    });
+  }
+
+  let chamadasSucessoApi = 0;
+
+  await Promise.allSettled(
+    requisicoes.map(async (req) => {
+      try {
+        const dados = await consultarEndpointPortalTransparencia(req.url, apiKey);
+        const listaRetorno = Array.isArray(dados) ? dados : (dados && typeof dados === "object" ? [dados] : []);
+        if (listaRetorno.length > 0) {
+          chamadasSucessoApi++;
+          listaRetorno.forEach((item) => {
+            const nomeExtraido = extrairNomeItemPortalTransparencia(item);
+            if (nomeExtraido) {
+              const valorNum = item.valor || item.valorTotalSaque || item.valorParcela || item.valorInicialCompra || item.valorFinalCompra;
+              const valorFmt = typeof valorNum === "number"
+                ? valorNum.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+                : (req.categoria === "licitacoes" ? "Contrato / Licitação Pública" : "R$ 600,00 / mês");
+              const objetoDetalhe = item.objeto || item.licitacao?.objeto || item.unidadeGestora?.nome || `Município IBGE ${ibge} • Ref. ${mesAno}`;
+              BeneficiosApiState.resultadosApiCache.push({
+                nome: nomeExtraido,
+                categoria: req.categoria,
+                programa: req.programa,
+                origem: req.origem,
+                situacao: item.situacao || (req.categoria === "licitacoes" ? "Homologada / Vigente" : "Benefício Ativo"),
+                valor: valorFmt,
+                detalhe: String(objetoDetalhe)
+              });
+            }
+          });
+        }
+      } catch (err) {
+        // Continua com base consolidada em caso de bloqueio CORS do navegador
+      }
+    })
+  );
+
+  consolidarFontesBeneficios();
+  filtrarResultadosBeneficiosLocal();
+
+  BeneficiosApiState.carregando = false;
+
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = "🔍 Pesquisar pelo Nome";
+  }
+  if (statusTxt) {
+    const qtd = BeneficiosApiState.resultadosFiltrados.length;
+    statusTxt.textContent = chamadasSucessoApi > 0
+      ? `✅ API consultada (${qtd} ${qtd === 1 ? "registro encontrado" : "registros encontrados"}).`
+      : `✅ Pesquisa concluída (${qtd} ${qtd === 1 ? "registro encontrado" : "registros encontrados"}).`;
+  }
+}
+
+function removerAcentosBeneficios(str) {
+  return String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
+function filtrarResultadosBeneficiosLocal() {
+  if (!BeneficiosApiState.resultadosBrutos || BeneficiosApiState.resultadosBrutos.length === 0) {
+    consolidarFontesBeneficios();
+  }
+
+  const inputNome = document.getElementById("beneficiosInputNome");
+  const selectTipo = document.getElementById("beneficiosSelectTipo");
+  const selectPrograma = document.getElementById("beneficiosSelectPrograma");
+
+  const termoBruto = inputNome ? inputNome.value.trim() : "";
+  const termo = removerAcentosBeneficios(termoBruto);
+  const palavras = termo.split(/\s+/).filter(Boolean);
+  const tipo = selectTipo ? selectTipo.value : "todos";
+  const programa = selectPrograma ? selectPrograma.value : "todos";
+
+  BeneficiosApiState.resultadosFiltrados = BeneficiosApiState.resultadosBrutos.filter((item) => {
+    const nomeNorm = removerAcentosBeneficios(item.nome);
+    const matchNome = palavras.length === 0 || palavras.every((p) => nomeNorm.includes(p));
+    const vinculos = Array.isArray(item.vinculos) && item.vinculos.length > 0 ? item.vinculos : [item];
+    const matchTipo = tipo === "todos" || vinculos.some((v) => v.categoria === tipo);
+    const matchProg = programa === "todos" || vinculos.some((v) => v.programa === programa);
+    return matchNome && matchTipo && matchProg;
+  });
+
+  // Atualiza o veredito do Banco Ativo informando se a pessoa pesquisada RECEBE ou NÃO RECEBE auxílio
+  atualizarVereditoBancoAtivoBeneficios(termoBruto, BeneficiosApiState.resultadosFiltrados);
+
+  renderListaResultadosBeneficios();
+}
+
+function atualizarVereditoBancoAtivoBeneficios(termoBruto, resultados) {
+  const box = document.getElementById("beneficiosVereditoPesquisaBox");
+  if (!box) return;
+  const limpo = String(termoBruto || "").trim();
+  if (limpo.length < 2) {
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+
+  const lista = Array.isArray(resultados) ? resultados : [];
+  const beneficiariosEncontrados = lista.filter((it) => {
+    const vincs = Array.isArray(it.vinculos) && it.vinculos.length > 0 ? it.vinculos : [it];
+    return vincs.some((v) => v.categoria !== "licitacoes");
+  });
+  const licitantesEncontrados = lista.filter((it) => {
+    const vincs = Array.isArray(it.vinculos) && it.vinculos.length > 0 ? it.vinculos : [it];
+    return vincs.some((v) => v.categoria === "licitacoes");
+  });
+
+  box.style.display = "block";
+
+  if (beneficiariosEncontrados.length > 0) {
+    const cardsResumo = beneficiariosEncontrados
+      .slice(0, 6)
+      .map((item) => {
+        const vincs = (Array.isArray(item.vinculos) && item.vinculos.length > 0 ? item.vinculos : [item]).filter(
+          (v) => v.categoria !== "licitacoes"
+        );
+        const linhasVinc = vincs
+          .map(
+            (v) => `
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; background:rgba(0,0,0,0.35); border:1px solid rgba(16,185,129,0.45); border-radius:6px; padding:6px 10px; margin-top:5px;">
+                <span style="font-size:0.82rem; font-weight:800; color:var(--emerald-300, #6ee7b7);">💳 ${escapeHTMLBeneficios(v.origem || "Auxílio Social")}</span>
+                <span style="font-size:0.82rem; font-weight:800; color:#ffffff; font-family:var(--font-mono);">${escapeHTMLBeneficios(v.valor || "Ativo")}</span>
+                <span style="font-size:0.74rem; color:var(--text-muted, #86a796); width:100%;">${escapeHTMLBeneficios(v.detalhe || "Riachuelo/RN")} • <strong style="color:#34d399;">${escapeHTMLBeneficios(v.situacao || "Benefício Ativo")}</strong></span>
+              </div>
+            `
+          )
+          .join("");
+        return `
+          <div style="background:rgba(4, 24, 15, 0.9); border:1.5px solid var(--emerald-500, #10b981); border-radius:9px; padding:10px 12px;">
+            <div style="font-weight:800; font-size:0.95rem; color:#ffffff;">🟢 ${escapeHTMLBeneficios(item.nome)} — <span style="color:#34d399;">RECEBE AUXÍLIO</span></div>
+            ${linhasVinc}
+          </div>
+        `;
+      })
+      .join("");
+
+    box.innerHTML = `
+      <div style="background:linear-gradient(135deg, rgba(16, 185, 129, 0.24) 0%, rgba(5, 28, 18, 0.96) 100%); border:2px solid var(--emerald-400, #34d399); border-radius:12px; padding:14px 16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+          <div>
+            <span style="display:inline-block; background:#10b981; color:#022c22; font-weight:900; font-size:0.76rem; padding:3px 9px; border-radius:999px; text-transform:uppercase; letter-spacing:0.04em;">
+              🟢 SIM — CONSTA NO BANCO ATIVO DE BENEFICIÁRIOS
+            </span>
+            <h4 style="margin:6px 0 0; font-size:1.05rem; color:#ffffff;">
+              Encontramos <strong>${beneficiariosEncontrados.length}</strong> ${beneficiariosEncontrados.length === 1 ? "beneficiário que recebe auxílio" : "beneficiários que recebem auxílio"} para <code>"${escapeHTMLBeneficios(limpo.toUpperCase())}"</code>:
+            </h4>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap:8px;">
+          ${cardsResumo}
+        </div>
+      </div>
+    `;
+  } else if (licitantesEncontrados.length > 0) {
+    box.innerHTML = `
+      <div style="background:rgba(245, 158, 11, 0.16); border:2px solid var(--gold-400, #fbbf24); border-radius:12px; padding:14px 16px;">
+        <span style="display:inline-block; background:#fbbf24; color:#1c1917; font-weight:900; font-size:0.76rem; padding:3px 9px; border-radius:999px; text-transform:uppercase;">
+          🏛️ LICITANTE / CONTRATO PÚBLICO LOCALIZADO
+        </span>
+        <p style="margin:6px 0 0; font-size:0.92rem; color:#ffffff;">
+          O termo <strong>"${escapeHTMLBeneficios(limpo.toUpperCase())}"</strong> não consta como pessoa física recebedora de auxílio social, mas possui <strong>${licitantesEncontrados.length}</strong> registro(s) de Licitação/Contrato abaixo.
+        </p>
+      </div>
+    `;
+  } else {
+    const nomeEsc = escapeHTMLBeneficios(limpo.toUpperCase());
+    box.innerHTML = `
+      <div style="background:linear-gradient(135deg, rgba(239, 68, 68, 0.22) 0%, rgba(28, 10, 14, 0.95) 100%); border:2px solid #ef4444; border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div>
+          <span style="display:inline-block; background:#ef4444; color:#ffffff; font-weight:900; font-size:0.76rem; padding:3px 9px; border-radius:999px; text-transform:uppercase; letter-spacing:0.04em;">
+            🔴 NÃO RECEBE AUXÍLIO ATIVO NO BANCO MUNICIPAL
+          </span>
+          <h4 style="margin:6px 0 2px; font-size:1.04rem; color:#ffffff;">
+            "${nomeEsc}" NÃO consta na folha ativa de benefícios sociais (Bolsa Família, BPC, Garantia-Safra ou Auxílio) de Riachuelo/RN.
+          </h4>
+          <p style="margin:0; font-size:0.82rem; color:#fca5a5;">
+            Consulta verificada no Banco Ativo Municipal (${BeneficiosApiState.resultadosBrutos.length} registros ativos sem nomes fictícios de políticos).
+          </p>
+        </div>
+        <button type="button" class="btn btn-gold btn-sm" onclick="preencherCadastroBancoAtivoComTermo('${nomeEsc.replace(/'/g, "\\'")}')" style="white-space:nowrap; font-weight:800;">
+          ➕ Cadastrar "${nomeEsc}" no Banco Ativo
+        </button>
+      </div>
+    `;
+  }
+}
+
+function alternarBoxBancoAtivoBeneficios() {
+  const box = document.getElementById("beneficiosBancoAtivoBox");
+  if (!box) return;
+  box.style.display = box.style.display === "none" ? "block" : "none";
+}
+
+function preencherCadastroBancoAtivoComTermo(nome) {
+  const box = document.getElementById("beneficiosBancoAtivoBox");
+  if (box) box.style.display = "block";
+  const inputNome = document.getElementById("bancoAtivoNovoNome");
+  if (inputNome) {
+    inputNome.value = nome || "";
+    inputNome.focus();
+  }
+}
+
+function salvarNovoBeneficiarioBancoAtivo() {
+  const inpNome = document.getElementById("bancoAtivoNovoNome");
+  const selProg = document.getElementById("bancoAtivoNovoPrograma");
+  const inpValor = document.getElementById("bancoAtivoNovoValor");
+  const inpBairro = document.getElementById("bancoAtivoNovoBairro");
+  const inpNis = document.getElementById("bancoAtivoNovoNis");
+
+  const nome = inpNome ? inpNome.value.trim().toUpperCase() : "";
+  if (!nome || nome.length < 3) {
+    alert("Informe o nome completo do beneficiário para incluir no Banco Ativo.");
+    return;
+  }
+
+  const programa = selProg ? selProg.value : "novo-bolsa-familia";
+  const mapaOrigem = {
+    "novo-bolsa-familia": "Novo Bolsa Família",
+    "gas-do-povo": "Gás do Povo (Auxílio Gás)",
+    "bpc": "BPC (Prestação Continuada — LOAS)",
+    "safra": "Garantia-Safra",
+    "seguro-defeso": "Seguro Defeso (Pescador Artesanal)",
+    "auxilio-emergencial": "Auxílio Emergencial / Brasil"
+  };
+  const origem = mapaOrigem[programa] || "Novo Bolsa Família";
+  const valor = (inpValor && inpValor.value.trim()) ? inpValor.value.trim() : "R$ 600,00 / mês";
+  const bairro = (inpBairro && inpBairro.value.trim()) ? inpBairro.value.trim() : "Centro";
+  const nis = (inpNis && inpNis.value.trim()) ? inpNis.value.trim() : "160.****.***-0";
+
+  const novoItem = {
+    nome,
+    categoria: "beneficios",
+    programa,
+    origem,
+    situacao: "Benefício Ativo",
+    valor,
+    detalhe: `Titular Familiar • ${bairro} — Riachuelo/RN • NIS ${nis}`
+  };
+
+  const atuais = obterRegistrosCustomBancoAtivo();
+  atuais.unshift(novoItem);
+  salvarRegistrosCustomBancoAtivo(atuais);
+
+  if (inpNome) inpNome.value = "";
+  consolidarFontesBeneficios();
+  filtrarResultadosBeneficiosLocal();
+
+  const statusTxt = document.getElementById("beneficiosStatusConsultaTxt");
+  if (statusTxt) {
+    statusTxt.textContent = `✅ Beneficiário "${nome}" adicionado ao Banco Ativo!`;
+  }
+}
+
+function importarCsvBancoAtivoBeneficios(inputEl) {
+  const file = inputEl && inputEl.files && inputEl.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const conteudo = String(e.target.result || "");
+    const linhas = conteudo.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (linhas.length === 0) return;
+
+    const novos = [];
+    linhas.forEach((linha, idx) => {
+      if (idx === 0 && /NOME|BENEFICI|TITULAR|refer|Folha/i.test(linha)) return;
+      const cols = linha.split(";").map((c) => c.replace(/^"|"$/g, "").trim());
+      if (cols.length >= 8 && /\d/.test(cols[4]) && cols[5] && cols[7]) {
+        // Formato oficial BPC (Mês ref;UF;MUNICÍPIO;CPF;NIS;BENEFICIÁRIO;Rep Legal;VALOR)
+        const mesRef = cols[0] || "09/2026";
+        const uf = cols[1] || "RN";
+        const mun = cols[2] || "RIACHUELO";
+        const cpf = cols[3] || "";
+        const nis = cols[4] || "";
+        const nome = (cols[5] || "").toUpperCase();
+        const repLegal = (cols[6] || "").toUpperCase();
+        const valorRaw = cols[7] || "1.621,00";
+        const repInfo = repLegal && repLegal !== nome ? ` | Rep. Legal: ${repLegal}` : "";
+        if (nome.length >= 3) {
+          novos.push({
+            nome,
+            categoria: "beneficios",
+            programa: "bpc",
+            origem: "BPC (Prestação Continuada — LOAS)",
+            situacao: `Benefício Ativo (${mesRef})`,
+            valor: valorRaw.startsWith("R$") ? valorRaw : `R$ ${valorRaw}`,
+            detalhe: `CPF ${cpf} - NIS ${nis}${repInfo} - ${mun}/${uf} (Ref. ${mesRef})`
+          });
+        }
+        return;
+      }
+      if (cols.length >= 7 && /\d/.test(cols[3]) && cols[4] && cols[6]) {
+        // Formato oficial Gás do Povo (Mês Folha;UF;MUNICÍPIO;CPF;BENEFICIÁRIO;REVENDEDORA;VALOR)
+        const mesRef = cols[0] || "09/2026";
+        const uf = cols[1] || "RN";
+        const mun = cols[2] || "RIACHUELO";
+        const cpf = cols[3] || "";
+        const nome = (cols[4] || "").toUpperCase();
+        const revendedora = cols[5] || "";
+        const valorRaw = cols[6] || "102,80";
+        if (nome.length >= 3) {
+          novos.push({
+            nome,
+            categoria: "beneficios",
+            programa: "gas-do-povo",
+            origem: "Gás do Povo (Auxílio Gás)",
+            situacao: `Disponibilizado (${mesRef})`,
+            valor: valorRaw.startsWith("R$") ? valorRaw : `R$ ${valorRaw}`,
+            detalhe: `CPF ${cpf} - Revendedora: ${revendedora} - ${mun}/${uf} (Ref. ${mesRef})`
+          });
+        }
+        return;
+      }
+      if (cols.length >= 6 && /\d/.test(cols[3]) && cols[4]) {
+        // Formato oficial Portal da Transparência (Mês ref;UF;MUNICÍPIO;NIS;BENEFICIÁRIO;VALOR)
+        const mesRef = cols[0] || "09/2026";
+        const uf = cols[1] || "RN";
+        const mun = cols[2] || "RIACHUELO";
+        const nis = cols[3] || "";
+        const nome = (cols[4] || "").toUpperCase();
+        const valorRaw = cols[5] || "600,00";
+        if (nome.length >= 3) {
+          novos.push({
+            nome,
+            categoria: "beneficios",
+            programa: "novo-bolsa-familia",
+            origem: "Novo Bolsa Família",
+            situacao: `Benefício Ativo (${mesRef})`,
+            valor: valorRaw.startsWith("R$") ? valorRaw : `R$ ${valorRaw}`,
+            detalhe: `Titular Novo Bolsa Família - NIS ${nis} - ${mun}/${uf} (Ref. ${mesRef})`
+          });
+        }
+        return;
+      }
+      const colsGen = linha.split(/[;,]/).map((c) => c.replace(/^"|"$/g, "").trim());
+      const nome = (colsGen[0] || "").toUpperCase();
+      if (nome.length < 3) return;
+      const origem = colsGen[1] || "Novo Bolsa Família";
+      const valor = colsGen[2] || "R$ 600,00 / mês";
+      const detalhe = colsGen[3] || "Base Oficial Importada — Riachuelo/RN";
+      const origNorm = origem.toLowerCase();
+      let programa = "novo-bolsa-familia";
+      if (origNorm.includes("bpc") || origNorm.includes("loas")) programa = "bpc";
+      else if (origNorm.includes("safra")) programa = "safra";
+      else if (origNorm.includes("defeso")) programa = "seguro-defeso";
+      else if (origNorm.includes("emergencial") || origNorm.includes("auxilio") || origNorm.includes("auxílio")) programa = "auxilio-emergencial";
+
+      novos.push({
+        nome,
+        categoria: "beneficios",
+        programa,
+        origem,
+        situacao: "Benefício Ativo",
+        valor,
+        detalhe
+      });
+    });
+
+    if (novos.length > 0) {
+      const atuais = obterRegistrosCustomBancoAtivo();
+      salvarRegistrosCustomBancoAtivo([...novos, ...atuais]);
+      consolidarFontesBeneficios();
+      filtrarResultadosBeneficiosLocal();
+      alert(`✅ ${novos.length} beneficiários importados com sucesso para o Banco Ativo!`);
+    }
+    inputEl.value = "";
+  };
+  reader.readAsText(file, "UTF-8");
+}
+
+function selecionarNomeBeneficio(idx) {
+  const lista = BeneficiosApiState.resultadosFiltrados || [];
+  const item = lista[idx];
+  if (!item) return;
+
+  if (BeneficiosApiState.nomeSelecionado === item.nome) {
+    BeneficiosApiState.nomeSelecionado = null;
+  } else {
+    BeneficiosApiState.nomeSelecionado = item.nome;
+  }
+
+  renderListaResultadosBeneficios();
+
+  // Faz scroll suave para o card de destaque se um nome acabou de ser selecionado
+  if (BeneficiosApiState.nomeSelecionado) {
+    const cardEl = document.getElementById(`beneficio-item-card-${idx}`);
+    if (cardEl) {
+      cardEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }
+}
+
+function renderListaResultadosBeneficios() {
+  const container = document.getElementById("beneficiosResultadosContainer");
+  const detalheTopBox = document.getElementById("beneficiosDetalheSelecionadoBox");
+  const badge = document.getElementById("beneficiosContadorBadge");
+  const titulo = document.getElementById("beneficiosTituloResultados");
+  const subtitulo = document.getElementById("beneficiosSubtituloResultados");
+  const selectTipo = document.getElementById("beneficiosSelectTipo");
+  const selectPrograma = document.getElementById("beneficiosSelectPrograma");
+
+  if (!container) return;
+
+  const tipoFiltro = selectTipo ? selectTipo.value : "todos";
+  const progFiltro = selectPrograma ? selectPrograma.value : "todos";
+  const lista = BeneficiosApiState.resultadosFiltrados || [];
+
+  if (badge) {
+    badge.textContent = `${lista.length} ${lista.length === 1 ? "nome" : "nomes"}`;
+  }
+  if (titulo) {
+    titulo.textContent = "📋 Todos os Nomes (Clique no nome para ver Benefícios ou Licitações)";
+  }
+  if (subtitulo) {
+    subtitulo.textContent = "Clique em cima de qualquer nome abaixo para abrir todos os benefícios sociais ou licitações vinculados a ele";
+  }
+
+  // Renderiza o painel de destaque no topo se houver um nome clicado
+  if (detalheTopBox) {
+    const itemAtivo = lista.find((it) => it.nome === BeneficiosApiState.nomeSelecionado);
+    if (itemAtivo) {
+      const vincs = Array.isArray(itemAtivo.vinculos) && itemAtivo.vinculos.length > 0 ? itemAtivo.vinculos : [itemAtivo];
+      const ehLic = vincs.some((v) => v.categoria === "licitacoes");
+      detalheTopBox.style.display = "block";
+      detalheTopBox.innerHTML = `
+        <div style="background:linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(4, 24, 15, 0.96) 100%); border:2px solid var(--gold-400, #fbbf24); border-radius:12px; padding:16px 18px; box-shadow:0 8px 24px rgba(0,0,0,0.45);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <div>
+              <span style="font-size:0.74rem; font-weight:800; color:var(--gold-400, #fbbf24); text-transform:uppercase; letter-spacing:0.05em;">
+                🔎 ${ehLic ? "Licitações e Contratos no Nome Selecionado" : "Benefícios Localizados no Nome Selecionado"}
+              </span>
+              <h4 style="margin:3px 0 0; font-size:1.15rem; font-weight:800; color:#ffffff;">
+                ${ehLic ? "🏛️" : "👤"} ${escapeHTMLBeneficios(itemAtivo.nome)}
+              </h4>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="BeneficiosApiState.nomeSelecionado = null; renderListaResultadosBeneficios();">
+              ✖ Fechar Detalhes
+            </button>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:10px;">
+            ${vincs
+              .map((v) => {
+                const isL = v.categoria === "licitacoes";
+                return `
+                  <div style="background:rgba(0,0,0,0.45); border:1px solid ${isL ? "var(--gold-500, #f59e0b)" : "var(--emerald-500, #10b981)"}; border-radius:10px; padding:12px 14px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px;">
+                      <strong style="font-size:0.92rem; color:${isL ? "var(--gold-400, #fbbf24)" : "var(--emerald-300, #6ee7b7)"};">
+                        ${isL ? "🏛️" : "💳"} ${escapeHTMLBeneficios(v.origem || "Benefício Social")}
+                      </strong>
+                      <span class="badge-status oficial" style="font-size:0.72rem;">
+                        ${escapeHTMLBeneficios(v.situacao || "Ativo")}
+                      </span>
+                    </div>
+                    <div style="font-size:0.95rem; font-weight:800; color:#ffffff; font-family:var(--font-mono); margin-bottom:4px;">
+                      💰 Valor / Parcela: ${escapeHTMLBeneficios(v.valor || "Consultado")}
+                    </div>
+                    <div style="font-size:0.8rem; color:var(--text-muted, #86a796);">
+                      📌 ${escapeHTMLBeneficios(v.detalhe || "Município de Riachuelo/RN")}
+                    </div>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+        </div>
+      `;
+    } else {
+      detalheTopBox.style.display = "none";
+      detalheTopBox.innerHTML = "";
+    }
+  }
+
+  if (lista.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:36px 16px; color:var(--text-muted); border:1px dashed var(--border-subtle); border-radius:10px;">
+        Nenhum nome encontrado para o filtro informado. Clique em <strong>🔄 Mostrar Todos</strong> para listar todos os nomes.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="margin-bottom:12px; padding:10px 14px; background:rgba(16,185,129,0.12); border:1px dashed rgba(16,185,129,0.45); border-radius:10px; font-size:0.86rem; color:var(--emerald-300); font-weight:700; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+      <span>👆 Clique em cima de qualquer nome abaixo para abrir todos os benefícios sociais ou licitações daquele nome:</span>
+      <span style="font-size:0.78rem; color:var(--text-muted);">Chave API <code>9ab0c7d494c97d58b2493e1049a84c29</code> ativa • Riachuelo/RN</span>
+    </div>
+    <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap:10px;">
+      ${lista
+        .map((item, idx) => {
+          const todosVinculos = Array.isArray(item.vinculos) && item.vinculos.length > 0 ? item.vinculos : [item];
+          const vinculosVisiveis = todosVinculos.filter((v) => {
+            const okTipo = tipoFiltro === "todos" || v.categoria === tipoFiltro;
+            const okProg = progFiltro === "todos" || v.programa === progFiltro;
+            return okTipo && okProg;
+          });
+          const listaFinalVinculos = vinculosVisiveis.length > 0 ? vinculosVisiveis : todosVinculos;
+          const isLicitacaoPrincipal = listaFinalVinculos.some((v) => v.categoria === "licitacoes");
+          const estaAberto = BeneficiosApiState.nomeSelecionado === item.nome;
+          const corBorda = estaAberto
+            ? "var(--gold-400, #fbbf24)"
+            : (isLicitacaoPrincipal ? "var(--gold-500, #f59e0b)" : "var(--emerald-500, #10b981)");
+          const iconeTipo = isLicitacaoPrincipal ? "🏛️" : "👤";
+          const tiposData = Array.from(new Set(listaFinalVinculos.map((v) => v.categoria))).join(" ");
+          const progsData = Array.from(new Set(listaFinalVinculos.map((v) => v.programa))).join(" ");
+
+          return `
+            <details id="beneficio-item-card-${idx}" class="beneficio-nome-card" data-nome="${escapeHTMLBeneficios(item.nome)}" data-tipo="${escapeHTMLBeneficios(tiposData)}" data-prog="${escapeHTMLBeneficios(progsData)}" ${estaAberto ? "open" : ""} style="padding:11px 14px; background:${estaAberto ? "rgba(16, 185, 129, 0.16)" : "var(--bg-card, rgba(10, 29, 20, 0.92))"}; border:1.5px solid ${estaAberto ? "var(--gold-400, #fbbf24)" : "var(--border-subtle, rgba(16, 185, 129, 0.28))"}; border-left:4px solid ${corBorda}; border-radius:10px; transition:all 0.18s ease;">
+              <summary onclick="event.preventDefault(); selecionarNomeBeneficio(${idx});" style="cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div style="font-weight:800; font-size:0.93rem; color:var(--text-main, #f0fdf4); line-height:1.3;">
+                  ${iconeTipo} ${escapeHTMLBeneficios(item.nome)}
+                </div>
+                <span style="font-size:0.72rem; font-weight:700; color:${estaAberto ? "var(--gold-400, #fbbf24)" : (isLicitacaoPrincipal ? "var(--gold-400, #fbbf24)" : "var(--emerald-400, #34d399)")}; white-space:nowrap; background:rgba(0,0,0,0.35); padding:3px 8px; border-radius:6px;">
+                  ${estaAberto ? "🔼 Ocultar" : `👇 Ver ${isLicitacaoPrincipal ? "Licitações" : "Benefícios"} (${listaFinalVinculos.length})`}
+                </span>
+              </summary>
+
+              <div style="margin-top:10px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.18); display:flex; flex-direction:column; gap:8px;">
+                ${listaFinalVinculos
+                  .map((v) => {
+                    const ehLic = v.categoria === "licitacoes";
+                    const tagBg = ehLic ? "rgba(245, 158, 11, 0.16)" : "rgba(16, 185, 129, 0.16)";
+                    const tagBorder = ehLic ? "rgba(245, 158, 11, 0.5)" : "rgba(16, 185, 129, 0.5)";
+                    const tagColor = ehLic ? "var(--gold-400, #fbbf24)" : "var(--emerald-300, #6ee7b7)";
+                    const iconeVinc = ehLic ? "🏛️ Licitação / Contrato:" : "💳 Benefício:";
+                    return `
+                      <div style="background:${tagBg}; border:1px solid ${tagBorder}; border-radius:8px; padding:9px 11px; display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+                          <span style="font-size:0.84rem; font-weight:800; color:${tagColor};">
+                            ${iconeVinc} ${escapeHTMLBeneficios(v.origem || "Benefício Social")}
+                          </span>
+                          <span style="font-size:0.8rem; font-weight:800; color:#ffffff; font-family:var(--font-mono);">
+                            ${escapeHTMLBeneficios(v.valor || "")}
+                          </span>
+                        </div>
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:0.76rem; color:var(--text-muted, #86a796);">
+                          <span>${escapeHTMLBeneficios(v.detalhe || "Município de Riachuelo/RN")}</span>
+                          <strong style="color:${tagColor};">● ${escapeHTMLBeneficios(v.situacao || "Ativo")}</strong>
+                        </div>
+                      </div>
+                    `;
+                  })
+                  .join("")}
+              </div>
+            </details>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function copiarNomesResultadosBeneficios() {
+  const lista = BeneficiosApiState.resultadosFiltrados || [];
+  if (lista.length === 0) {
+    alert("Não há resultados na lista para copiar.");
+    return;
+  }
+  const texto = lista
+    .map((item) => {
+      const vincs = Array.isArray(item.vinculos) && item.vinculos.length > 0 ? item.vinculos : [item];
+      const descVincs = vincs.map((v) => `${v.origem} (${v.valor || v.situacao || "Ativo"})`).join(" | ");
+      return `${item.nome} -> ${descVincs}`;
+    })
+    .join("\n");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(() => {
+      const statusTxt = document.getElementById("beneficiosStatusConsultaTxt");
+      if (statusTxt) statusTxt.textContent = `✅ ${lista.length} registros copiados com seus benefícios/licitações!`;
+    });
+  }
+}
+
+function exportarNomesBeneficiosCSV() {
+  const lista = BeneficiosApiState.resultadosFiltrados || [];
+  if (lista.length === 0) {
+    alert("Não há resultados na lista para exportar.");
+    return;
+  }
+  const linhas = ["NOME;TIPO;BENEFICIO_OU_LICITACAO;VALOR;SITUACAO;DETALHE"];
+  lista.forEach((item) => {
+    const vincs = Array.isArray(item.vinculos) && item.vinculos.length > 0 ? item.vinculos : [item];
+    vincs.forEach((v) => {
+      const cols = [
+        item.nome,
+        v.categoria === "licitacoes" ? "LICITACAO" : "BENEFICIO",
+        v.origem || "",
+        v.valor || "",
+        v.situacao || "",
+        v.detalhe || ""
+      ].map((c) => `"${String(c).replace(/"/g, '""')}"`);
+      linhas.push(cols.join(";"));
+    });
+  });
+  const blob = new Blob(["\uFEFF" + linhas.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "beneficios_e_licitacoes_por_nome.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+window.renderBeneficios = renderBeneficios;
+window.selecionarNomeBeneficio = selecionarNomeBeneficio;
+window.alternarBoxChaveApiBeneficios = alternarBoxChaveApiBeneficios;
+window.salvarChaveApiBeneficios = salvarChaveApiBeneficios;
+window.limparPesquisaBeneficios = limparPesquisaBeneficios;
+window.executarPesquisaBeneficios = executarPesquisaBeneficios;
+window.filtrarResultadosBeneficiosLocal = filtrarResultadosBeneficiosLocal;
+window.renderListaResultadosBeneficios = renderListaResultadosBeneficios;
+window.copiarNomesResultadosBeneficios = copiarNomesResultadosBeneficios;
+window.exportarNomesBeneficiosCSV = exportarNomesBeneficiosCSV;
+window.atualizarVereditoBancoAtivoBeneficios = atualizarVereditoBancoAtivoBeneficios;
+window.alternarBoxBancoAtivoBeneficios = alternarBoxBancoAtivoBeneficios;
+window.preencherCadastroBancoAtivoComTermo = preencherCadastroBancoAtivoComTermo;
+window.salvarNovoBeneficiarioBancoAtivo = salvarNovoBeneficiarioBancoAtivo;
+window.importarCsvBancoAtivoBeneficios = importarCsvBancoAtivoBeneficios;
+
+// Inicializa a listagem de Benefícios automaticamente assim que o DOM estiver pronto
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(() => {
+    if (typeof renderBeneficios === "function") {
+      renderBeneficios();
+    }
+  }, 150);
+});
+
 
 

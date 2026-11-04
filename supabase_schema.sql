@@ -7,6 +7,7 @@
 create table if not exists public.eleitores (
   id text primary key,
   nome text not null,
+  "dataNascimento" text,
   numero_titulo text,
   "numeroTitulo" text,
   rua text,
