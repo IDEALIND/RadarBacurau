@@ -52,24 +52,38 @@ const TSE_CONFIG = {
 };
 
 const TSE_HISTORICO_SECOES = (function() {
-  const secoesBase = [
-    { secao: "0012", localId: "loc-01", localNome: "Escola Estadual Prof. Manoel Gurgel", bairro: "Centro Histórico", aptos: 385, pesoUrbano: 1.05, pesoJoca: 0.95 },
-    { secao: "0013", localId: "loc-01", localNome: "Escola Estadual Prof. Manoel Gurgel", bairro: "Centro Histórico", aptos: 380, pesoUrbano: 1.02, pesoJoca: 0.97 },
-    { secao: "0014", localId: "loc-01", localNome: "Escola Estadual Prof. Manoel Gurgel", bairro: "Bairro Novo", aptos: 390, pesoUrbano: 1.00, pesoJoca: 1.02 },
-    { secao: "0015", localId: "loc-01", localNome: "Escola Estadual Prof. Manoel Gurgel", bairro: "Bairro Novo", aptos: 385, pesoUrbano: 0.98, pesoJoca: 1.04 },
-    { secao: "0016", localId: "loc-02", localNome: "Escola Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 340, pesoUrbano: 1.08, pesoJoca: 0.92 },
-    { secao: "0017", localId: "loc-02", localNome: "Escola Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 335, pesoUrbano: 1.04, pesoJoca: 0.94 },
-    { secao: "0018", localId: "loc-02", localNome: "Escola Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 330, pesoUrbano: 1.03, pesoJoca: 0.96 },
-    { secao: "0019", localId: "loc-02", localNome: "Escola Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 335, pesoUrbano: 1.01, pesoJoca: 0.98 },
-    { secao: "0020", localId: "loc-02", localNome: "Escola Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 340, pesoUrbano: 1.00, pesoJoca: 1.00 },
-    { secao: "0021", localId: "loc-03", localNome: "Escola Municipal Cel. Antonio Garcia", bairro: "Alto da Boa Vista", aptos: 345, pesoUrbano: 0.94, pesoJoca: 1.08 },
-    { secao: "0022", localId: "loc-03", localNome: "Escola Municipal Cel. Antonio Garcia", bairro: "Alto da Boa Vista", aptos: 340, pesoUrbano: 0.95, pesoJoca: 1.07 },
-    { secao: "0023", localId: "loc-03", localNome: "Escola Municipal Cel. Antonio Garcia", bairro: "Alto da Boa Vista", aptos: 335, pesoUrbano: 0.96, pesoJoca: 1.06 },
-    { secao: "0024", localId: "loc-04", localNome: "EMEF Assentamento Furnas", bairro: "Assentamento Furnas (Rural)", aptos: 410, pesoUrbano: 0.85, pesoJoca: 1.15 },
-    { secao: "0025", localId: "loc-05", localNome: "EM Pres. Tancredo Neves", bairro: "Serra da Formiga (Rural)", aptos: 495, pesoUrbano: 0.88, pesoJoca: 1.12 },
-    { secao: "0026", localId: "loc-06", localNome: "EM Rural Sítio Potengi", bairro: "Cachoeira do Sapo / Potengi", aptos: 520, pesoUrbano: 0.90, pesoJoca: 1.10 },
-    { secao: "0027", localId: "loc-07", localNome: "Creche Municipal Pequenos Querubins", bairro: "Bairro Novo / Conjunto", aptos: 580, pesoUrbano: 0.97, pesoJoca: 1.05 }
-  ];
+  const secoesBase = (typeof TSE_OFICIAL_2024_SECOES !== 'undefined' && Array.isArray(TSE_OFICIAL_2024_SECOES) && TSE_OFICIAL_2024_SECOES.length === 20)
+    ? TSE_OFICIAL_2024_SECOES.map(s => ({
+        secao: s.secao,
+        localId: s.localId,
+        localNome: s.localNome,
+        bairro: s.bairro || s.bairroComunidade || "Riachuelo",
+        aptos: s.aptos || 360,
+        pesoUrbano: s.localId === 'loc-1082' ? 0.88 : 1.02,
+        pesoJoca: s.localId === 'loc-1082' ? 1.12 : 0.98
+      }))
+    : [
+        { secao: "0001", localId: "loc-1139", localNome: "Creche Municipal Pequenos Querubins", bairro: "Bairro Novo / Conjunto Severiano", aptos: 285, pesoUrbano: 1.0, pesoJoca: 1.0 },
+        { secao: "0002", localId: "loc-1031", localNome: "Colégio Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 410, pesoUrbano: 1.05, pesoJoca: 0.95 },
+        { secao: "0003", localId: "loc-1031", localNome: "Colégio Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 405, pesoUrbano: 1.02, pesoJoca: 0.97 },
+        { secao: "0004", localId: "loc-1031", localNome: "Colégio Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 405, pesoUrbano: 1.00, pesoJoca: 1.00 },
+        { secao: "0005", localId: "loc-1031", localNome: "Colégio Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 410, pesoUrbano: 1.04, pesoJoca: 0.96 },
+        { secao: "0006", localId: "loc-1120", localNome: "Escola Municipal Manoel Gurgel", bairro: "Bairro Novo", aptos: 365, pesoUrbano: 1.00, pesoJoca: 1.02 },
+        { secao: "0007", localId: "loc-1120", localNome: "Escola Municipal Manoel Gurgel", bairro: "Bairro Novo", aptos: 370, pesoUrbano: 0.98, pesoJoca: 1.04 },
+        { secao: "0008", localId: "loc-1120", localNome: "Escola Municipal Manoel Gurgel", bairro: "Bairro Novo", aptos: 355, pesoUrbano: 1.00, pesoJoca: 1.00 },
+        { secao: "0009", localId: "loc-1120", localNome: "Escola Municipal Manoel Gurgel", bairro: "Bairro Novo", aptos: 370, pesoUrbano: 1.02, pesoJoca: 0.98 },
+        { secao: "0010", localId: "loc-1031", localNome: "Colégio Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 405, pesoUrbano: 1.06, pesoJoca: 0.94 },
+        { secao: "0011", localId: "loc-1139", localNome: "Creche Municipal Pequenos Querubins", bairro: "Bairro Novo / Conjunto Severiano", aptos: 280, pesoUrbano: 0.97, pesoJoca: 1.05 },
+        { secao: "0012", localId: "loc-1082", localNome: "Grupo Municipal Francisco Caetano", bairro: "Cachoeira do Sapo / Potengi", aptos: 310, pesoUrbano: 0.88, pesoJoca: 1.12 },
+        { secao: "0013", localId: "loc-1082", localNome: "Grupo Municipal Francisco Caetano", bairro: "Cachoeira do Sapo / Potengi", aptos: 310, pesoUrbano: 0.88, pesoJoca: 1.12 },
+        { secao: "0066", localId: "loc-1139", localNome: "Creche Municipal Pequenos Querubins", bairro: "Bairro Novo / Conjunto Severiano", aptos: 280, pesoUrbano: 0.98, pesoJoca: 1.04 },
+        { secao: "0067", localId: "loc-1120", localNome: "Escola Municipal Manoel Gurgel", bairro: "Bairro Novo", aptos: 390, pesoUrbano: 1.00, pesoJoca: 1.00 },
+        { secao: "0071", localId: "loc-1082", localNome: "Grupo Municipal Francisco Caetano", bairro: "Cachoeira do Sapo / Potengi", aptos: 320, pesoUrbano: 0.85, pesoJoca: 1.15 },
+        { secao: "0085", localId: "loc-1031", localNome: "Colégio Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 415, pesoUrbano: 1.05, pesoJoca: 0.95 },
+        { secao: "0093", localId: "loc-1031", localNome: "Colégio Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 405, pesoUrbano: 1.04, pesoJoca: 0.96 },
+        { secao: "0101", localId: "loc-1031", localNome: "Colégio Estadual Manoel Severiano", bairro: "Centro Histórico", aptos: 395, pesoUrbano: 1.03, pesoJoca: 0.97 },
+        { secao: "0102", localId: "loc-1120", localNome: "Escola Municipal Manoel Gurgel", bairro: "Bairro Novo", aptos: 355, pesoUrbano: 1.00, pesoJoca: 1.00 }
+      ];
 
   const resultados = [];
 
@@ -173,56 +187,11 @@ const TSE_HISTORICO_SECOES = (function() {
   }
 
   // =========================================================================
-  // 1. ELEIÇÕES 2024 (MUNICIPAIS)
+  // 1. ELEIÇÕES 2024 (MUNICIPAIS - DADOS 100% OFICIAIS TSE - 20 SEÇÕES)
   // =========================================================================
-  registrarEleicao({
-    ano: 2024,
-    cargo: "Prefeito",
-    eleicao: "Eleições Municipais 2024",
-    turno: "1º Turno",
-    candidatosDef: [
-      { nome: "Joca Basílio", numero: "20", partido: "PODE", percentualBase: 0.542, perfilRegional: "joca", situacao: "Eleito Prefeito" },
-      { nome: "Mara Cavalcanti", numero: "15", partido: "MDB", percentualBase: 0.458, perfilRegional: "mara", situacao: "Não Eleito" }
-    ],
-    fatorComparecimento: 0.89,
-    percentualBrancos: 0.0038,
-    percentualNulos: 0.0227
-  });
-
-  // Lista com TODOS os nomes específicos de vereadores de 2024 em Riachuelo
-  registrarEleicao({
-    ano: 2024,
-    cargo: "Vereador",
-    eleicao: "Eleições Municipais 2024",
-    turno: "Único",
-    candidatosDef: [
-      { nome: "Gustavo Moura", numero: "55123", partido: "PSD", percentualBase: 0.0988, perfilRegional: "joca", situacao: "Eleito (1º Lugar)" },
-      { nome: "Washington Alves", numero: "55555", partido: "PSD", percentualBase: 0.0931, perfilRegional: "joca", situacao: "Eleito (2º Lugar)" },
-      { nome: "Thiago Martins", numero: "15111", partido: "MDB", percentualBase: 0.0703, perfilRegional: "mara", situacao: "Eleito (3º Lugar)" },
-      { nome: "Rêmulo Basílio", numero: "55111", partido: "PSD", percentualBase: 0.0702, perfilRegional: "joca", situacao: "Eleito (4º Lugar)" },
-      { nome: "Graciliano Belchior", numero: "55222", partido: "PSD", percentualBase: 0.0694, perfilRegional: "joca", situacao: "Eleito (5º Lugar)" },
-      { nome: "Deca Brito", numero: "55444", partido: "PSD", percentualBase: 0.0687, perfilRegional: "joca", situacao: "Eleito (6º Lugar)" },
-      { nome: "Claudymar Felipe", numero: "15222", partido: "MDB", percentualBase: 0.0657, perfilRegional: "mara", situacao: "Eleito (7º Lugar)" },
-      { nome: "Mazinho Arruda", numero: "15333", partido: "MDB", percentualBase: 0.0512, perfilRegional: "mara", situacao: "Eleito (8º Lugar)" },
-      { nome: "Cleoneide Acioli", numero: "13123", partido: "PT", percentualBase: 0.0448, perfilRegional: "pt", situacao: "Eleita (9º Lugar)" },
-      { nome: "Gilmar da Saúde", numero: "20123", partido: "PODE", percentualBase: 0.0393, perfilRegional: "joca", situacao: "1º Suplente" },
-      { nome: "Marcone de Furnas", numero: "55789", partido: "PSD", percentualBase: 0.0366, perfilRegional: "joca", situacao: "2º Suplente" },
-      { nome: "Professora Rita", numero: "15888", partido: "MDB", percentualBase: 0.0337, perfilRegional: "mara", situacao: "3º Suplente" },
-      { nome: "Zé Pequeno da Cachoeira", numero: "20456", partido: "PODE", percentualBase: 0.0313, perfilRegional: "joca", situacao: "Suplente" },
-      { nome: "Carlinhos de Serra Formiga", numero: "55333", partido: "PSD", percentualBase: 0.0292, perfilRegional: "joca", situacao: "Suplente" },
-      { nome: "Damião do Potengi", numero: "15678", partido: "MDB", percentualBase: 0.0263, perfilRegional: "mara", situacao: "Suplente" },
-      { nome: "Maria de Fátima do Centro", numero: "13456", partido: "PT", percentualBase: 0.0228, perfilRegional: "pt", situacao: "Suplente" },
-      { nome: "Beto do Alto da Boa Vista", numero: "55999", partido: "PSD", percentualBase: 0.0205, perfilRegional: "joca", situacao: "Suplente" },
-      { nome: "Sandra da Saúde", numero: "20777", partido: "PODE", percentualBase: 0.0185, perfilRegional: "joca", situacao: "Suplente" },
-      { nome: "Francisco do Sítio", numero: "15001", partido: "MDB", percentualBase: 0.0157, perfilRegional: "mara", situacao: "Não Eleito" },
-      { nome: "Antônio Mecânico", numero: "20000", partido: "PODE", percentualBase: 0.0138, perfilRegional: "joca", situacao: "Não Eleito" },
-      { nome: "Joana da Pastoral", numero: "13000", partido: "PT", percentualBase: 0.0119, perfilRegional: "pt", situacao: "Não Eleito" },
-      { nome: "Lucas Jovem", numero: "55000", partido: "PSD", percentualBase: 0.0100, perfilRegional: "joca", situacao: "Não Eleito" }
-    ],
-    fatorComparecimento: 0.89,
-    percentualBrancos: 0.015,
-    percentualNulos: 0.021
-  });
+  if (typeof TSE_OFICIAL_2024_RESULTADOS !== 'undefined' && Array.isArray(TSE_OFICIAL_2024_RESULTADOS)) {
+    TSE_OFICIAL_2024_RESULTADOS.forEach(r => resultados.push(r));
+  }
 
   // =========================================================================
   // 2. ELEIÇÕES 2022 (GERAIS)
@@ -640,7 +609,7 @@ const TSE_SERVICE = {
   },
 
   getDossieSecao(numeroSecao) {
-    const registros = TSE_HISTORICO_SECOES.filter(r => r.secao === numeroSecao);
+    const registros = TSE_HISTORICO_SECOES.filter(r => r.secao === numeroSecao || Number(r.secao) === Number(numeroSecao));
     if (!registros.length) return null;
 
     const baseInfo = {

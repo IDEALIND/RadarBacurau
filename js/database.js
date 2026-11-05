@@ -21,7 +21,9 @@ class RadarBacurauDB {
         // Validação: Garante que Cachoeira do Sapo (com-00) e os polígonos estão presentes
         const temCachoeira = this.data.comunidades && this.data.comunidades.some(c => c.id === "com-00");
         const temPoligonos = this.data.comunidades && this.data.comunidades.some(c => c.poligono && c.poligono.length >= 3);
-        if (!temCachoeira || !temPoligonos || !this.data.municipioInfo || this.data.municipioInfo.versaoBase !== SEED_DATA.municipioInfo.versaoBase) {
+                const tem20Secoes = this.data.secoesEleitorais && this.data.secoesEleitorais.length === 20;
+        const temSecoesAntigas = this.data.secoesEleitorais && this.data.secoesEleitorais.some(s => s.secao === '0027' || s.secao === '0014');
+        if (!temCachoeira || !temPoligonos || !tem20Secoes || temSecoesAntigas || !this.data.municipioInfo || this.data.municipioInfo.versaoBase !== SEED_DATA.municipioInfo.versaoBase) {
           this.resetToSeed();
         } else {
           // Remove quaisquer dados fictícios de eleitores
@@ -43,7 +45,8 @@ class RadarBacurauDB {
           this.data.demandas = [];
           this.save();
         }
-        if (!this.data.simuladorConfig) {
+        const temSimuladorMock = this.data.simuladorConfig && this.data.simuladorConfig.partidos && this.data.simuladorConfig.partidos.some(p => p.id === 'par-01' || p.id === 'par-02' || (p.sigla && p.sigla.includes('UNIÃO BRASIL')));
+        if (!this.data.simuladorConfig || temSimuladorMock || !this.data.simuladorConfig.partidos || this.data.simuladorConfig.partidos.length !== 3 || this.data.simuladorConfig.eleitoresAptos !== 7225) {
           this.data.simuladorConfig = JSON.parse(JSON.stringify(SEED_DATA.simuladorConfig || {}));
           this.save();
         }
@@ -1070,7 +1073,7 @@ class RadarBacurauDB {
       list = list.filter(r => r.turno && r.turno.toLowerCase() === filtros.turno.toLowerCase());
     }
     if (filtros.secao) {
-      list = list.filter(r => r.secao === filtros.secao);
+      list = list.filter(r => r.secao === filtros.secao || Number(r.secao) === Number(filtros.secao));
     }
     if (filtros.busca) {
       const q = filtros.busca.toLowerCase();
@@ -1612,9 +1615,9 @@ class RadarBacurauDB {
   calcularQuocienteEleitoral(customParams = null) {
     const config = customParams ? { ...this.getSimuladorConfig(), ...customParams } : this.getSimuladorConfig();
 
-    const eleitoresAptos = Number(config.eleitoresAptos) || 6245;
-    const abstencaoPct = Number(config.abstencaoProjetadaPct) || 14.5;
-    const brancosNulosPct = Number(config.brancosNulosPct) || 4.2;
+    const eleitoresAptos = Number(config.eleitoresAptos) || 7225;
+    const abstencaoPct = Number(config.abstencaoProjetadaPct) || 11.5;
+    const brancosNulosPct = Number(config.brancosNulosPct) || 2.9;
     const totalCadeiras = Number(config.totalCadeiras) || 9;
     const clausulaIndivPct = Number(config.clausulaDesempenhoIndividualPct) || 10;
     const clausulaSobrasPartidoPct = Number(config.clausulaSobrasPartidoPct) || 80;
