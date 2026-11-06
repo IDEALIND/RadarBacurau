@@ -2688,18 +2688,30 @@ function renderEleitores() {
     if (filtroLider) {
       filtroLider.innerHTML = `<option value="${currentUser.nome}" selected>🎖️ Meus Eleitores Exclusivos (${currentUser.nome})</option>`;
       filtroLider.disabled = true;
+      filtroLider.dataset.isLiderLock = "true";
     }
   } else {
     if (bannerLider) bannerLider.style.display = "none";
     if (filtroLider) {
       filtroLider.disabled = false;
-      if (filtroLider.options.length <= 1) {
-        const valAtual = filtroLider.value;
-        const lideresDb = db.getLiderancas().map(l => l.nome);
-        const lideresDosEleitores = estatisticas.porLideranca.map(l => l.lideranca);
-        const todosLideres = [...new Set([...lideresDb, ...lideresDosEleitores].filter(Boolean))];
-        filtroLider.innerHTML = '<option value="">Todas as Lideranças</option>' +
-          todosLideres.map(l => `<option value="${l}" ${l === valAtual ? 'selected' : ''}>${l}</option>`).join("");
+      const estavaTravadoLider = filtroLider.dataset.isLiderLock === "true" || filtroLider.options.length <= 1;
+      if (estavaTravadoLider) {
+        filtroLider.dataset.isLiderLock = "false";
+      }
+
+      const lideresDb = db.getLiderancas().map(l => l.nome);
+      const lideresDosEleitores = estatisticas.porLideranca.map(l => l.lideranca);
+      const todosLideres = [...new Set([...lideresDb, ...lideresDosEleitores].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+      
+      const valAtual = estavaTravadoLider ? "" : filtroLider.value;
+      const liderExiste = valAtual && todosLideres.includes(valAtual);
+      const selecionado = liderExiste ? valAtual : "";
+
+      filtroLider.innerHTML = `<option value="" ${!selecionado ? 'selected' : ''}>Todas as Lideranças</option>` +
+        todosLideres.map(l => `<option value="${l}" ${l === selecionado ? 'selected' : ''}>${l}</option>`).join("");
+      
+      if (!liderExiste) {
+        filtroLider.value = "";
       }
     }
   }
@@ -3112,7 +3124,7 @@ function verificarConflitoEleitorInstantaneo() {
   }
 }
 
-function aoSelecionarFotoTitulo(event) {
+async function aoSelecionarFotoTitulo(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
@@ -3121,9 +3133,8 @@ function aoSelecionarFotoTitulo(event) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const base64 = e.target.result;
+  try {
+    const base64 = await processarImagemArquivo(file, 1280, 0.78);
     const hidden = document.getElementById("formEleitorFotoBase64");
     const previewImg = document.getElementById("eleitorFotoPreviewImg");
     const previewContainer = document.getElementById("eleitorFotoPreviewContainer");
@@ -3133,9 +3144,11 @@ function aoSelecionarFotoTitulo(event) {
     if (previewImg) previewImg.src = base64;
     if (previewContainer) previewContainer.style.display = "block";
     if (uploadArea) uploadArea.style.display = "none";
-    showToast("Imagem anexada com sucesso!");
-  };
-  reader.readAsDataURL(file);
+    showToast("Imagem otimizada e anexada com sucesso!");
+  } catch (err) {
+    console.error("Erro ao processar imagem do título:", err);
+    showToast("Erro ao processar imagem.");
+  }
 }
 
 function removerFotoTituloAnexada() {
@@ -3954,6 +3967,20 @@ function abrirModalNovaDemanda() {
   AppState.midiasDemandaEmEdicao = [];
   renderPreviewMidiasDemanda();
 
+  // Reseta Foto de Resolução da Demanda
+  const hiddenFotoResolucao = document.getElementById("formDemandaFotoResolucaoBase64");
+  if (hiddenFotoResolucao) hiddenFotoResolucao.value = "";
+  const inputFotoResolucao = document.getElementById("formDemandaFotoResolucaoInput");
+  if (inputFotoResolucao) inputFotoResolucao.value = "";
+  const previewFotoResolucao = document.getElementById("demandaFotoResolucaoPreviewContainer");
+  if (previewFotoResolucao) previewFotoResolucao.style.display = "none";
+  const uploadAreaFotoResolucao = document.getElementById("demandaFotoResolucaoUploadArea");
+  if (uploadAreaFotoResolucao) uploadAreaFotoResolucao.style.display = "block";
+
+  // Reseta Campo Editável de Prompt
+  const promptTextoEl = document.getElementById("formDemandaPromptTexto");
+  if (promptTextoEl) promptTextoEl.value = "";
+
   // Inicializa estado dos prompts customizados e alertas
   if (typeof alternarFormNovoPromptCustom === "function") alternarFormNovoPromptCustom(false);
   if (typeof renderizarPromptsCustom === "function") renderizarPromptsCustom();
@@ -3961,7 +3988,6 @@ function abrirModalNovaDemanda() {
   if (alertaFinancEl) alertaFinancEl.style.display = "none";
   const solEl = document.getElementById("formDemandaSolucaoNotas");
   if (solEl) solEl.style.borderColor = "rgba(16,185,129,0.4)";
-
 
   // Popula bairros
   const bairroSelect = document.getElementById("formDemandaBairro");
@@ -4017,14 +4043,17 @@ function salvarFormDemanda() {
   const status = document.getElementById("formDemandaStatus")?.value || "Pendente";
   const dataPrevisao = document.getElementById("formDemandaDataPrevisao")?.value || "";
   const solucaoNotas = (document.getElementById("formDemandaSolucaoNotas")?.value || "").trim();
+  const promptResolucao = (document.getElementById("formDemandaPromptTexto")?.value || "").trim();
+  const fotoResolucao = (document.getElementById("formDemandaFotoResolucaoBase64")?.value || "").trim();
 
-  // BLOQUEIO ANTI-FINANCEIRO NA RESOLUÇÃO
-  const erroFinanc = detectarMencaoFinanceira(solucaoNotas);
-  if (erroFinanc) {
-    showToast(`⛔ Bloqueio: Não é permitido registrar referências a dinheiro ou valores (${erroFinanc.termo}).`, "error");
-    alert(`⛔ BLOQUEIO DE CONFORMIDADE:\n\nNão é permitido registrar nenhuma menção a dinheiro, valores monetários (R$, cifras), pagamentos, custos ou PIX na resolução de demandas comunitárias.\n\nTermo identificado: "${erroFinanc.termo}".\n\nPor favor, remova os valores financeiros e registre apenas as ações operacionais, comunitárias ou estruturais executadas.`);
+  // DIRETRIZ DE CONFORMIDADE NA RESOLUÇÃO E NO PROMPT (SEM MENÇÃO A TERMOS FINANCEIROS)
+  const erroSolucao = detectarMencaoFinanceira(solucaoNotas);
+  const erroPrompt = detectarMencaoFinanceira(promptResolucao);
+  if (erroSolucao || erroPrompt) {
+    showToast(`⛔ Registro restrito: Descreva apenas ações operacionais e serviços públicos executados.`, "error");
+    alert(`⛔ DIRETRIZ DE REGISTRO & CONFORMIDADE:\n\nPor diretriz de gestão e conformidade, registre apenas ações operacionais, melhorias de infraestrutura e serviços públicos executados na resolução de demandas comunitárias.\n\nPor favor, reformule o texto focando exclusivamente no atendimento prestado à comunidade.`);
     const solEl = document.getElementById("formDemandaSolucaoNotas");
-    if (solEl) {
+    if (solEl && erroSolucao) {
       solEl.focus();
       solEl.style.borderColor = "#ef4444";
     }
@@ -4049,6 +4078,8 @@ function salvarFormDemanda() {
     dataPrevisao: dataPrevisao,
     descricao: descricao,
     solucaoNotas: solucaoNotas,
+    promptResolucao: promptResolucao,
+    fotoResolucao: fotoResolucao,
     anexos: AppState.midiasDemandaEmEdicao || []
   };
 
@@ -4085,6 +4116,29 @@ function editarDemanda(id) {
   document.getElementById("formDemandaDescricao").value = d.descricao || "";
   document.getElementById("formDemandaSolucaoNotas").value = d.solucaoNotas || "";
 
+  // Carrega Prompt da Demanda para edição
+  const promptInput = document.getElementById("formDemandaPromptTexto");
+  if (promptInput) promptInput.value = d.promptResolucao || "";
+
+  // Carrega Imagem de Resolução da Demanda se houver
+  const hiddenFoto = document.getElementById("formDemandaFotoResolucaoBase64");
+  const previewContainer = document.getElementById("demandaFotoResolucaoPreviewContainer");
+  const uploadArea = document.getElementById("demandaFotoResolucaoUploadArea");
+  const imgEl = document.getElementById("demandaFotoResolucaoPreviewImg");
+  const nomeEl = document.getElementById("demandaFotoResolucaoNome");
+
+  if (d.fotoResolucao && hiddenFoto && previewContainer && uploadArea && imgEl) {
+    hiddenFoto.value = d.fotoResolucao;
+    imgEl.src = d.fotoResolucao;
+    if (nomeEl) nomeEl.textContent = "comprovante_resolucao.jpg";
+    previewContainer.style.display = "flex";
+    uploadArea.style.display = "none";
+  } else if (hiddenFoto && previewContainer && uploadArea) {
+    hiddenFoto.value = "";
+    previewContainer.style.display = "none";
+    uploadArea.style.display = "block";
+  }
+
   AppState.midiasDemandaEmEdicao = Array.isArray(d.anexos) ? JSON.parse(JSON.stringify(d.anexos)) : [];
   renderPreviewMidiasDemanda();
 
@@ -4094,12 +4148,79 @@ function editarDemanda(id) {
 }
 
 // ==========================================
+// REGISTRO DE FOTO DE RESOLUÇÃO DA DEMANDA
+// ==========================================
+
+function aoSelecionarFotoResolucaoDemanda(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    showToast("Por favor, selecione um arquivo de imagem válido (JPG, PNG ou WEBP).", "error");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result;
+    const hiddenInput = document.getElementById("formDemandaFotoResolucaoBase64");
+    const previewContainer = document.getElementById("demandaFotoResolucaoPreviewContainer");
+    const uploadArea = document.getElementById("demandaFotoResolucaoUploadArea");
+    const imgEl = document.getElementById("demandaFotoResolucaoPreviewImg");
+    const nomeEl = document.getElementById("demandaFotoResolucaoNome");
+    const statusSelect = document.getElementById("formDemandaStatus");
+
+    if (hiddenInput) hiddenInput.value = base64;
+    if (imgEl) imgEl.src = base64;
+    if (nomeEl) nomeEl.textContent = file.name || "foto_resolucao.jpg";
+    if (previewContainer) previewContainer.style.display = "flex";
+    if (uploadArea) uploadArea.style.display = "none";
+
+    // Sugere marcar como concluído ao anexar o comprovante da solução
+    if (statusSelect && statusSelect.value !== "Concluído") {
+      statusSelect.value = "Concluído";
+    }
+
+    showToast("Imagem de como foi resolvido anexada com sucesso!");
+  };
+  reader.readAsDataURL(file);
+}
+
+function removerFotoResolucaoDemanda() {
+  const hiddenInput = document.getElementById("formDemandaFotoResolucaoBase64");
+  const fileInput = document.getElementById("formDemandaFotoResolucaoInput");
+  const previewContainer = document.getElementById("demandaFotoResolucaoPreviewContainer");
+  const uploadArea = document.getElementById("demandaFotoResolucaoUploadArea");
+  const imgEl = document.getElementById("demandaFotoResolucaoPreviewImg");
+
+  if (hiddenInput) hiddenInput.value = "";
+  if (fileInput) fileInput.value = "";
+  if (imgEl) imgEl.src = "";
+  if (previewContainer) previewContainer.style.display = "none";
+  if (uploadArea) uploadArea.style.display = "block";
+
+  showToast("Imagem de resolução removida.");
+}
+
+function ampliarFotoResolucaoAtual() {
+  const hiddenInput = document.getElementById("formDemandaFotoResolucaoBase64");
+  const imgEl = document.getElementById("demandaFotoResolucaoPreviewImg");
+  const src = (hiddenInput && hiddenInput.value) || (imgEl && imgEl.src);
+  if (!src) return;
+
+  if (typeof abrirVisualizadorMidiaDireto === "function") {
+    abrirVisualizadorMidiaDireto("foto", src, "Comprovante de Resolução da Demanda");
+  } else {
+    window.open(src, "_blank");
+  }
+}
+
+// ==========================================
 // REGISTRO DE SOLUÇÃO DE DEMANDAS & PROMPTS PERSONALIZADOS
 // ==========================================
 
 /**
- * Filtro Anti-Financeiro: Impede postagem de qualquer conteúdo sobre dinheiro,
- * moedas, cifras (R$, $), PIX, custos, pagamentos ou quantias.
+ * Filtro de Conformidade: Impede registro de qualquer menção financeira, monetária ou termos incompatíveis.
  */
 function detectarMencaoFinanceira(texto) {
   if (!texto || typeof texto !== "string") return null;
@@ -4115,12 +4236,13 @@ function detectarMencaoFinanceira(texto) {
 
   // 2. Números seguidos de unidades monetárias
   if (/\b\d+([.,]\d+)?\s*(reais|real|conto|contos|centavo|centavos|pila|pilas)\b/i.test(semAcento)) {
-    return { termo: "Expressão de quantia em dinheiro" };
+    return { termo: "Expressão de quantia monetária" };
   }
 
-  // 3. Vocabulário financeiro estrito
-  const termosFinanceiros = [
+  // 3. Vocabulário restrito
+  const termosRestritos = [
     { nome: "dinheiro", regex: /\bdinheiro(s)?\b/i },
+    { nome: "correcao monetaria", regex: /\b(correcao\s+monetaria|monetari(o|a|os|as))\b/i },
     { nome: "pix", regex: /\bpix\b/i },
     { nome: "reais", regex: /\breais\b/i },
     { nome: "pagamento", regex: /\bpagamento(s)?\b/i },
@@ -4146,7 +4268,7 @@ function detectarMencaoFinanceira(texto) {
     { nome: "ajuda de custo", regex: /\b(ajuda\s+de\s+custo)\b/i }
   ];
 
-  for (const item of termosFinanceiros) {
+  for (const item of termosRestritos) {
     if (item.regex.test(semAcento)) {
       return { termo: item.nome };
     }
@@ -4156,7 +4278,7 @@ function detectarMencaoFinanceira(texto) {
 }
 
 /**
- * Validação visual em tempo real enquanto o usuário digita
+ * Validação visual em tempo real enquanto o usuário digita notas de solução
  */
 function aoDigitarSolucaoDemanda(event) {
   const textarea = document.getElementById("formDemandaSolucaoNotas");
@@ -4173,20 +4295,60 @@ function aoDigitarSolucaoDemanda(event) {
   }
 }
 
+/**
+ * Validação visual em tempo real enquanto o usuário edita seu prompt
+ */
+function aoDigitarPromptDemanda(event) {
+  const textarea = document.getElementById("formDemandaPromptTexto");
+  if (!textarea) return;
+
+  const erro = detectarMencaoFinanceira(textarea.value);
+  if (erro) {
+    textarea.style.borderColor = "#ef4444";
+  } else {
+    textarea.style.borderColor = "rgba(16,185,129,0.4)";
+  }
+}
+
 // ------------------------------------------
 // GERENCIADOR DE PROMPTS CUSTOMIZADOS DO USUÁRIO
 // ------------------------------------------
 const CHAVE_STORAGE_PROMPTS_CUSTOM = "RADAR_PROMPTS_SOLUCAO_CUSTOM";
 
+const PROMPTS_PADRAO_SISTEMA = [
+  {
+    id: "p_infra_1",
+    titulo: "Patrolamento & Drenagem",
+    texto: "Ofício encaminhado à Secretaria Municipal de Infraestrutura solicitando patrolamento, cascalhamento e nivelamento da via pública com drenagem das águas pluviais."
+  },
+  {
+    id: "p_luz_2",
+    titulo: "Iluminação Pública LED",
+    texto: "Ordem de serviço aberta junto ao setor competente para substituição das luminárias convencionais por lâmpadas de LED de alto rendimento no trecho indicado."
+  },
+  {
+    id: "p_social_3",
+    titulo: "Atendimento Comunitário",
+    texto: "Demanda acolhida e articulada diretamente com a liderança do bairro, com cronograma de visita técnica e encaminhamento aos órgãos competentes."
+  }
+];
+
 function obterPromptsCustom() {
   try {
     const raw = localStorage.getItem(CHAVE_STORAGE_PROMPTS_CUSTOM);
-    if (!raw) return [];
+    if (!raw) {
+      salvarPromptsCustomLista(PROMPTS_PADRAO_SISTEMA);
+      return PROMPTS_PADRAO_SISTEMA;
+    }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      salvarPromptsCustomLista(PROMPTS_PADRAO_SISTEMA);
+      return PROMPTS_PADRAO_SISTEMA;
+    }
+    return parsed;
   } catch (e) {
     console.warn("Falha ao carregar prompts customizados:", e);
-    return [];
+    return PROMPTS_PADRAO_SISTEMA;
   }
 }
 
@@ -4196,6 +4358,102 @@ function salvarPromptsCustomLista(lista) {
   } catch (e) {
     console.error("Falha ao salvar prompts customizados:", e);
   }
+}
+
+function salvarPromptAtualComoFavorito() {
+  const textarea = document.getElementById("formDemandaPromptTexto");
+  if (!textarea) return;
+  const texto = textarea.value.trim();
+
+  if (!texto) {
+    showToast("Digite seu prompt no campo de texto antes de salvar.", "error");
+    textarea.focus();
+    return;
+  }
+
+  const erroTexto = detectarMencaoFinanceira(texto);
+  if (erroTexto) {
+    showToast("⛔ Diretriz restrita: Descreva apenas ações operacionais e serviços públicos.", "error");
+    alert("⛔ DIRETRIZ DE CONFORMIDADE:\n\nCadastre prompts voltados unicamente a ações estruturais, melhorias e atendimentos comunitários.");
+    return;
+  }
+
+  const tituloSugerido = texto.length > 30 ? texto.substring(0, 28) + "..." : texto;
+  const titulo = prompt("Informe um título para salvar este prompt nos seus atalhos:", tituloSugerido);
+  if (titulo === null) return; // cancelou
+
+  const tituloFinal = titulo.trim() || tituloSugerido;
+
+  const lista = obterPromptsCustom();
+  lista.push({
+    id: "p_" + Date.now(),
+    titulo: tituloFinal,
+    texto: texto
+  });
+  salvarPromptsCustomLista(lista);
+  renderizarPromptsCustom();
+  showToast(`Prompt "${tituloFinal}" salvo como atalho com sucesso!`);
+}
+
+function aplicarPromptNasNotasSolucao() {
+  const promptInput = document.getElementById("formDemandaPromptTexto");
+  const notasInput = document.getElementById("formDemandaSolucaoNotas");
+  const statusSelect = document.getElementById("formDemandaStatus");
+  if (!promptInput || !notasInput) return;
+
+  const textoPrompt = promptInput.value.trim();
+  if (!textoPrompt) {
+    showToast("Digite ou edite seu prompt antes de inserir nas notas.", "error");
+    promptInput.focus();
+    return;
+  }
+
+  const erro = detectarMencaoFinanceira(textoPrompt);
+  if (erro) {
+    showToast("⛔ Diretriz restrita: Descreva apenas ações operacionais e comunitárias.", "error");
+    return;
+  }
+
+  const now = new Date();
+  const dataHoraStr = `[${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}]`;
+  const linhaFormatada = `${dataHoraStr} - ${textoPrompt}`;
+
+  if (notasInput.value && notasInput.value.trim().length > 0) {
+    notasInput.value = notasInput.value.trim() + "\n\n" + linhaFormatada;
+  } else {
+    notasInput.value = linhaFormatada;
+  }
+
+  if (statusSelect && statusSelect.value !== "Concluído") {
+    statusSelect.value = "Concluído";
+  }
+
+  notasInput.focus();
+  notasInput.scrollTop = notasInput.scrollHeight;
+  aoDigitarSolucaoDemanda();
+  showToast("Prompt aplicado nas notas de solução!");
+}
+
+function limparCampoPromptDemanda() {
+  const promptInput = document.getElementById("formDemandaPromptTexto");
+  if (promptInput) {
+    promptInput.value = "";
+    promptInput.style.borderColor = "rgba(16,185,129,0.4)";
+    promptInput.focus();
+    showToast("Campo de prompt limpo.");
+  }
+}
+
+function carregarPromptNoCampoEdicao(id) {
+  const lista = obterPromptsCustom();
+  const p = lista.find(item => item.id === id);
+  const promptInput = document.getElementById("formDemandaPromptTexto");
+  if (!p || !promptInput) return;
+
+  promptInput.value = p.texto;
+  promptInput.focus();
+  aoDigitarPromptDemanda();
+  showToast(`Prompt "${p.titulo}" carregado no campo de texto para edição!`);
 }
 
 function alternarFormNovoPromptCustom(mostrar) {
@@ -4233,13 +4491,11 @@ function salvarNovoPromptCustom() {
     return;
   }
 
-  // Validação Anti-Dinheiro também nos prompts criados
   const erroTitulo = detectarMencaoFinanceira(titulo);
   const erroTexto = detectarMencaoFinanceira(texto);
   if (erroTitulo || erroTexto) {
-    const termo = erroTitulo ? erroTitulo.termo : erroTexto.termo;
-    showToast(`⛔ Bloqueio: Não é permitido criar prompts com menção a dinheiro (${termo}).`, "error");
-    alert(`⛔ DIRETRIZ DE CONFORMIDADE:\n\nNão é permitido criar prompts com citações a dinheiro, valores financeiros, pagamentos, custos ou PIX.\n\nTermo detectado: "${termo}".\n\nPor favor, cadastre prompts voltados unicamente a ações estruturais e atendimentos comunitários.`);
+    showToast(`⛔ Diretriz restrita: Descreva apenas ações operacionais e serviços públicos.`, "error");
+    alert(`⛔ DIRETRIZ DE CONFORMIDADE:\n\nPor conformidade de governança, cadastre prompts voltados unicamente a ações estruturais e atendimentos comunitários.`);
     return;
   }
 
@@ -4265,7 +4521,7 @@ function removerPromptCustom(id) {
   const item = lista.find(p => p.id === id);
   const nome = item ? item.titulo : "o prompt";
 
-  if (!confirm(`Deseja realmente excluir o seu prompt "${nome}"?`)) {
+  if (!confirm(`Deseja realmente excluir o atalho de prompt "${nome}"?`)) {
     return;
   }
 
@@ -4276,61 +4532,39 @@ function removerPromptCustom(id) {
 }
 
 function inserirPromptCustom(id) {
-  const lista = obterPromptsCustom();
-  const p = lista.find(item => item.id === id);
-  const textarea = document.getElementById("formDemandaSolucaoNotas");
-  const statusSelect = document.getElementById("formDemandaStatus");
-
-  if (!p || !textarea) return;
-
-  // Verificação de segurança adicional
-  const erroFinanc = detectarMencaoFinanceira(p.texto);
-  if (erroFinanc) {
-    showToast(`⛔ Prompt bloqueado por conter menções a dinheiro (${erroFinanc.termo}).`, "error");
-    return;
-  }
-
-  const now = new Date();
-  const dataHoraStr = `[${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}]`;
-
-  const textoComData = `${dataHoraStr} - ${p.texto}`;
-
-  if (textarea.value && textarea.value.trim().length > 0) {
-    textarea.value = textarea.value.trim() + "\n\n" + textoComData;
-  } else {
-    textarea.value = textoComData;
-  }
-
-  if (statusSelect) {
-    statusSelect.value = "Concluído";
-  }
-
-  textarea.focus();
-  textarea.scrollTop = textarea.scrollHeight;
-
-  aoDigitarSolucaoDemanda();
-  showToast(`Prompt "${p.titulo}" inserido!`);
+  carregarPromptNoCampoEdicao(id);
 }
 
 function renderizarPromptsCustom() {
-  const container = document.getElementById("listaChipsPromptsCustom");
-  if (!container) return;
-
+  const containerChipsModal = document.getElementById("listaChipsPromptsDemanda");
+  const containerChipsLegado = document.getElementById("listaChipsPromptsCustom");
   const lista = obterPromptsCustom();
-  if (lista.length === 0) {
-    container.innerHTML = `<span style="font-size:0.73rem; color:#64748b; font-style:italic;">Nenhum prompt salvo ainda. Clique em "+ Novo Prompt" acima para cadastrar seus próprios atalhos de solução.</span>`;
-    return;
-  }
 
   const escapeAttr = (s) => (s || "").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const escapeTxt = (s) => (s || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  container.innerHTML = lista.map(p => `
-    <div class="custom-prompt-chip" onclick="inserirPromptCustom('${p.id}')" title="${escapeAttr(p.texto)}">
-      <span>${escapeTxt(p.titulo)}</span>
-      <span class="chip-del-btn" onclick="event.stopPropagation(); removerPromptCustom('${p.id}')" title="Excluir este prompt">&times;</span>
+  const chipsHtml = lista.map(p => `
+    <div class="custom-prompt-chip" onclick="carregarPromptNoCampoEdicao('${p.id}')" title="Clique para editar: ${escapeAttr(p.texto)}" style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:6px; padding:3px 8px; font-size:0.75rem; color:#a7f3d0; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">
+      <span>✏️ ${escapeTxt(p.titulo)}</span>
+      <span class="chip-del-btn" onclick="event.stopPropagation(); removerPromptCustom('${p.id}')" title="Excluir este prompt" style="color:#ef4444; font-weight:bold; cursor:pointer; padding:0 2px;">&times;</span>
     </div>
   `).join("");
+
+  if (containerChipsModal) {
+    if (lista.length === 0) {
+      containerChipsModal.innerHTML = `<span style="font-size:0.73rem; color:var(--text-muted); font-style:italic;">Nenhum prompt salvo. Digite seu texto acima e clique em "Salvar como Meu Prompt Padrão".</span>`;
+    } else {
+      containerChipsModal.innerHTML = chipsHtml;
+    }
+  }
+
+  if (containerChipsLegado) {
+    if (lista.length === 0) {
+      containerChipsLegado.innerHTML = `<span style="font-size:0.73rem; color:#64748b; font-style:italic;">Nenhum prompt salvo.</span>`;
+    } else {
+      containerChipsLegado.innerHTML = chipsHtml;
+    }
+  }
 }
 
 function inserirDataHoraSolucaoDemanda() {
@@ -4421,6 +4655,36 @@ function abrirDetalhesDemanda(id) {
             ${d.solucaoNotas || 'Nenhum encaminhamento registrado até o momento. Utilize os botões abaixo para atualizar o status e registrar novos ofícios.'}
           </div>
         </div>
+
+        ${d.promptResolucao ? `
+        <div style="border-top:1px solid var(--border-subtle); padding-top:12px; margin-top:14px;">
+          <div style="font-weight:700; color:var(--emerald-400); font-size:0.86rem; margin-bottom:6px;">🤖 Diretriz / Meu Prompt Aplicado na Demanda:</div>
+          <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); padding:12px; border-radius:var(--radius-sm); font-size:0.85rem; color:#a7f3d0; line-height:1.5;">
+            ${d.promptResolucao}
+          </div>
+        </div>
+        ` : ''}
+
+        ${d.fotoResolucao ? `
+        <div style="border-top:1px solid var(--border-subtle); padding-top:14px; margin-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+            <div style="font-weight:700; color:var(--gold-400); font-size:0.88rem; display:flex; align-items:center; gap:6px;">
+              <span>✅ Imagem de Como Foi Resolvido (Comprovante de Conclusão):</span>
+            </div>
+            <span class="badge-status oficial" style="font-size:0.7rem; background:rgba(16,185,129,0.2); color:var(--emerald-400); border-color:var(--emerald-500);">Execução Comprovada</span>
+          </div>
+          <div style="background:rgba(0,0,0,0.5); border:1px solid rgba(245,158,11,0.35); border-radius:10px; padding:12px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+            <img src="${d.fotoResolucao}" alt="Comprovante de Resolução" style="width:140px; height:105px; object-fit:cover; border-radius:8px; border:2px solid var(--border-gold); cursor:pointer;" onclick="abrirVisualizadorMidiaDireto('foto', '${d.fotoResolucao}', 'Comprovante de Resolução - ${d.titulo.replace(/'/g, "\\'")}')" title="Clique para tela cheia">
+            <div style="flex:1; min-width:200px;">
+              <div style="font-weight:700; color:#ffffff; font-size:0.9rem; margin-bottom:4px;">Registro Fotográfico da Execução</div>
+              <p style="font-size:0.8rem; color:var(--text-muted); margin:0 0 10px 0;">Evidência visual comprovando o atendimento da demanda no território.</p>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="abrirVisualizadorMidiaDireto('foto', '${d.fotoResolucao}', 'Comprovante de Resolução - ${d.titulo.replace(/'/g, "\\'")}')" style="font-size:0.75rem; padding:4px 10px;">
+                🔍 Visualizar em Alta Resolução
+              </button>
+            </div>
+          </div>
+        </div>
+        ` : ''}
 
         <!-- Seção de Galeria de Mídias (Fotos e Vídeos) -->
         <div class="dossie-midias-section">
@@ -5184,6 +5448,56 @@ function exportarRelatorioTSECSV() {
   showToast("Relatório CSV do TSE exportado com sucesso!");
 }
 
+function dispararSeletorCsvTse() {
+  const input = document.getElementById("inputCsvVotacaoRN");
+  if (input) {
+    input.click();
+  }
+}
+
+function aoImportarCsvVotacaoRN(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const conteudo = e.target.result;
+      if (typeof TSE_SERVICE === 'undefined' || !TSE_SERVICE.processarCsvVotacaoRN) {
+        showToast("Módulo TSE_SERVICE não está disponível.");
+        return;
+      }
+
+      showToast("⏳ Processando dados oficiais TSE de Riachuelo–RN...");
+      const res = TSE_SERVICE.processarCsvVotacaoRN(conteudo);
+      if (res && res.sucesso && res.resultados && res.resultados.length > 0) {
+        db.importarResultadosTSE(res.resultados);
+        showToast(`✅ Votação TSE carregada com sucesso! ${res.totalLinhasRiachuelo} linhas de Riachuelo em ${res.secoesProcessadas} seções.`);
+
+        // Atualiza Dashboard, Resultados, Estatísticas e Ranking
+        if (typeof renderDashboard === "function") renderDashboard();
+        if (typeof renderResultados === "function") renderResultados();
+        if (typeof renderEstatisticas === "function") renderEstatisticas();
+        if (typeof renderRankingTerritorial === "function") renderRankingTerritorial();
+      } else {
+        showToast("⚠️ Nenhum registro de Riachuelo (Código 17973) encontrado no arquivo.");
+      }
+    } catch (err) {
+      console.error("Erro ao importar CSV do TSE:", err);
+      showToast(`❌ Erro no arquivo CSV: ${err.message}`);
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  reader.onerror = function() {
+    showToast("Erro ao abrir o arquivo CSV selecionado.");
+    event.target.value = "";
+  };
+
+  reader.readAsText(file, "UTF-8");
+}
+
 function navegarParaSecoesDoBairro(secaoNumero) {
   if (secaoNumero) {
     AppState.tse.secao = secaoNumero;
@@ -5624,7 +5938,7 @@ function abrirMapaSecoesCandidato(chaveCandidatoDecoded) {
 
   const secoesOrdenadas = [...(cand.votosPorSecao || [])].sort((a, b) => b.votos - a.votos);
 
-  // 1. Renderiza os 16 Cards das Seções
+  // 1. Renderiza os 20 Cards das Seções
   if (cardsGrid) {
     cardsGrid.innerHTML = secoesOrdenadas.map((s, idx) => {
       const isPolo = cand.secaoMaisForte && String(cand.secaoMaisForte.secao) === String(s.secao);
@@ -9847,11 +10161,11 @@ function gerarHomonimosMunicipaisPorTermo(termoBruto, tipo, programa) {
   const palavras = limpo.split(/\s+/).filter(Boolean);
 
   const origensMap = {
-    "novo-bolsa-familia": { origem: "Novo Bolsa Família", situacao: "Benefício Liberado / Ativo", valor: "R$ 600,00 / mês", detalhe: "Titular Familiar • Folha Regular Riachuelo/RN" },
-    "bpc": { origem: "BPC (Prestação Continuada)", situacao: "Benefício Ativo", valor: "R$ 1.412,00 / mês", detalhe: "Benefício de Prestação Continuada (LOAS) • Riachuelo/RN" },
-    "safra": { origem: "Garantia-Safra", situacao: "Benefício Pago", valor: "R$ 1.200,00 (Safra)", detalhe: "Agricultor Familiar (PRONAF) • Zona Rural Riachuelo/RN" },
-    "seguro-defeso": { origem: "Seguro Defeso (Pescador Artesanal)", situacao: "Benefício Concedido", valor: "R$ 1.412,00 / parcela", detalhe: "Pescador Profissional Artesanal • Rio Potengi / Riachuelo-RN" },
-    "auxilio-emergencial": { origem: "Auxílio Emergencial / Brasil", situacao: "Benefício Concedido", valor: "R$ 600,00 / mês", detalhe: "Cadastro Único Federal • Riachuelo/RN" }
+    "novo-bolsa-familia": { origem: "Novo Bolsa Família", situacao: "Benefício Liberado / Ativo", valor: "Ativo / Folha Regular", detalhe: "Titular Familiar • Folha Regular Riachuelo/RN" },
+    "bpc": { origem: "BPC (Prestação Continuada)", situacao: "Benefício Ativo", valor: "Ativo / Regular", detalhe: "Benefício de Prestação Continuada (LOAS) • Riachuelo/RN" },
+    "safra": { origem: "Garantia-Safra", situacao: "Benefício Homologado", valor: "Safra Homologada", detalhe: "Agricultor Familiar (PRONAF) • Zona Rural Riachuelo/RN" },
+    "seguro-defeso": { origem: "Seguro Defeso (Pescador Artesanal)", situacao: "Benefício Concedido", valor: "Concedido / Regular", detalhe: "Pescador Profissional Artesanal • Rio Potengi / Riachuelo-RN" },
+    "auxilio-emergencial": { origem: "Auxílio Emergencial / Brasil", situacao: "Benefício Concedido", valor: "Cadastrado / Regular", detalhe: "Cadastro Único Federal • Riachuelo/RN" }
   };
 
   if (incluirBeneficios && programa !== "licitacoes") {
@@ -9875,7 +10189,7 @@ function gerarHomonimosMunicipaisPorTermo(termoBruto, tipo, programa) {
           programa: "safra",
           origem: "Garantia-Safra / CadÚnico",
           situacao: "Aderido / Regular",
-          valor: "R$ 1.200,00",
+          valor: "Safra Homologada",
           detalhe: "Cadastro Municipal — Riachuelo/RN"
         });
       }
@@ -9920,10 +10234,10 @@ function gerarHomonimosMunicipaisPorTermo(termoBruto, tipo, programa) {
 
   if (incluirLicitacoes && (programa === "todos" || programa === "licitacoes")) {
     const objetosLicitacao = [
-      { mod: "Pregão Eletrônico nº 014/2024", val: "R$ 148.500,00", obj: "Objeto: Fornecimento de materiais e prestação de serviços para a Administração Municipal de Riachuelo/RN" },
-      { mod: "Tomada de Preços nº 006/2024", val: "R$ 276.400,00", obj: "Objeto: Execução de obras de manutenção predial e infraestrutura urbana em Riachuelo/RN" },
-      { mod: "Pregão Eletrônico nº 021/2024", val: "R$ 94.800,00", obj: "Objeto: Aquisição de suprimentos, insumos e equipamentos para atendimento das Secretarias Municipais" },
-      { mod: "Contrato Administrativo nº 039/2024", val: "R$ 182.000,00", obj: "Objeto: Prestação de serviços especializados e locação operacional — Prefeitura de Riachuelo/RN" }
+      { mod: "Pregão Eletrônico nº 014/2024", val: "Contrato Ativo", obj: "Objeto: Fornecimento de materiais e prestação de serviços para a Administração Municipal de Riachuelo/RN" },
+      { mod: "Tomada de Preços nº 006/2024", val: "Obra em Andamento", obj: "Objeto: Execução de obras de manutenção predial e infraestrutura urbana em Riachuelo/RN" },
+      { mod: "Pregão Eletrônico nº 021/2024", val: "Fornecimento Regular", obj: "Objeto: Aquisição de suprimentos, insumos e equipamentos para atendimento das Secretarias Municipais" },
+      { mod: "Contrato Administrativo nº 039/2024", val: "Vigência Regular", obj: "Objeto: Prestação de serviços especializados e locação operacional — Prefeitura de Riachuelo/RN" }
     ];
 
     if (palavras.length >= 2) {
@@ -10273,13 +10587,13 @@ function atualizarVereditoBancoAtivoBeneficios(termoBruto, resultados) {
     box.innerHTML = `
       <div style="background:linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(16, 185, 129, 0.22) 100%); border:2px solid var(--gold-400, #fbbf24); border-radius:12px; padding:14px 16px;">
         <span style="display:inline-block; background:#fbbf24; color:#1c1917; font-weight:900; font-size:0.76rem; padding:3px 9px; border-radius:999px; text-transform:uppercase;">
-          ⭐ CRUZAMENTO LOCALIZADO: BENEFÍCIO SOCIAL & PAGAMENTO DA PREFEITURA
+          ⭐ CRUZAMENTO LOCALIZADO: BENEFÍCIO SOCIAL & CONTRATO DA PREFEITURA
         </span>
         <h4 style="margin:6px 0 4px; font-size:1.05rem; color:#ffffff;">
           Localizado cruzamento para <code>"${escapeHTMLBeneficios(limpo.toUpperCase())}"</code> (${duplosEncontrados.length} registro(s)):
         </h4>
         <p style="margin:0; font-size:0.84rem; color:var(--text-muted, #86a796);">
-          Consta tanto na folha de auxílios sociais (Bolsa Família, Gás do Povo ou BPC) quanto como credor/fornecedor com despesas pagas pela Prefeitura de Riachuelo (Exercício 2026).
+          Consta tanto na folha de auxílios sociais (Bolsa Família, Gás do Povo ou BPC) quanto como fornecedor/prestador com registros na Prefeitura de Riachuelo (Exercício 2026).
         </p>
       </div>
     `;
@@ -10301,10 +10615,10 @@ function atualizarVereditoBancoAtivoBeneficios(termoBruto, resultados) {
           🏛️ CONSTA NA TRANSPARÊNCIA MUNICIPAL (PREFEITURA DE RIACHUELO)
         </span>
         <h4 style="margin:6px 0 2px; font-size:1.04rem; color:#ffffff;">
-          Encontrado(s) <strong>${transparenciaEncontrados.length}</strong> credor(es)/fornecedor(es) com despesas/pagamentos para <code>"${escapeHTMLBeneficios(limpo.toUpperCase())}"</code>.
+          Encontrado(s) <strong>${transparenciaEncontrados.length}</strong> fornecedor(es)/prestador(es) com registros oficiais para <code>"${escapeHTMLBeneficios(limpo.toUpperCase())}"</code>.
         </h4>
         <p style="margin:4px 0 0; font-size:0.82rem; color:var(--text-muted, #86a796);">
-          Dados extraídos do Portal da Transparência — Despesas por Fornecedor (Exercício 2026).
+          Dados extraídos do Portal da Transparência — Registros por Fornecedor (Exercício 2026).
         </p>
       </div>
     `;
@@ -10318,7 +10632,7 @@ function atualizarVereditoBancoAtivoBeneficios(termoBruto, resultados) {
           🏛️ TRANSPARÊNCIA (${transparenciaEncontrados.length})
         </span>
         <h4 style="margin:6px 0 2px; font-size:1.04rem; color:#ffffff;">
-          Registros localizados tanto em Benefícios quanto em Despesas da Prefeitura para <code>"${escapeHTMLBeneficios(limpo.toUpperCase())}"</code>.
+          Registros localizados tanto em Benefícios quanto em Fornecedores da Prefeitura para <code>"${escapeHTMLBeneficios(limpo.toUpperCase())}"</code>.
         </h4>
       </div>
     `;
@@ -10331,7 +10645,7 @@ function atualizarVereditoBancoAtivoBeneficios(termoBruto, resultados) {
             🔴 NÃO LOCALIZADO NO BANCO ATIVO
           </span>
           <h4 style="margin:6px 0 2px; font-size:1.04rem; color:#ffffff;">
-            "${nomeEsc}" NÃO consta na folha ativa de benefícios sociais nem nas despesas por fornecedor da Prefeitura de Riachuelo/RN.
+            "${nomeEsc}" NÃO consta na folha ativa de benefícios sociais nem nos registros de fornecedores da Prefeitura de Riachuelo/RN.
           </h4>
           <p style="margin:0; font-size:0.82rem; color:#fca5a5;">
             Consulta verificada no banco consolidado de Transparência e Benefícios (${BeneficiosApiState.resultadosBrutos.length} registros ativos).
@@ -10385,7 +10699,7 @@ function salvarNovoBeneficiarioBancoAtivo() {
     "auxilio-emergencial": "Auxílio Emergencial / Brasil"
   };
   const origem = mapaOrigem[programa] || "Novo Bolsa Família";
-  const valor = (inpValor && inpValor.value.trim()) ? inpValor.value.trim() : "R$ 600,00 / mês";
+  const valor = (inpValor && inpValor.value.trim()) ? inpValor.value.trim() : "Ativo / Regular";
   const bairro = (inpBairro && inpBairro.value.trim()) ? inpBairro.value.trim() : "Centro";
   const nis = (inpNis && inpNis.value.trim()) ? inpNis.value.trim() : "160.****.***-0";
 
@@ -10497,7 +10811,7 @@ function importarCsvBancoAtivoBeneficios(inputEl) {
       const nome = (colsGen[0] || "").toUpperCase();
       if (nome.length < 3) return;
       const origem = colsGen[1] || "Novo Bolsa Família";
-      const valor = colsGen[2] || "R$ 600,00 / mês";
+      const valor = colsGen[2] || "Ativo / Regular";
       const detalhe = colsGen[3] || "Base Oficial Importada — Riachuelo/RN";
       const origNorm = origem.toLowerCase();
       let programa = "novo-bolsa-familia";
@@ -10613,7 +10927,7 @@ function renderListaResultadosBeneficios() {
                       </span>
                     </div>
                     <div style="font-size:0.95rem; font-weight:800; color:#ffffff; font-family:var(--font-mono); margin-bottom:4px;">
-                      💰 Valor / Parcela: ${escapeHTMLBeneficios(v.valor || "Consultado")}
+                      📋 Situação Cadastral: ${escapeHTMLBeneficios(v.valor || "Regular")}
                     </div>
                     <div style="font-size:0.8rem; color:var(--text-muted, #86a796);">
                       📌 ${escapeHTMLBeneficios(v.detalhe || "Município de Riachuelo/RN")}

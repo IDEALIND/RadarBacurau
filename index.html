@@ -899,7 +899,7 @@
               <span>🛡️ Zero Risco de Ban</span>
             </div>
             <div class="wpp-meta-pill">
-              <span>⚡ Sem Custo de Servidor/API</span>
+              <span>⚡ Operação Nativa e Direta</span>
             </div>
           </div>
         </div>
@@ -1218,12 +1218,14 @@
                 <option value="Vereador">Vereador</option>
               </select>
               <select class="form-select" id="filtroResultadoSecao" onchange="aoMudarFiltrosTSE()">
-                <option value="">Todas as 16 Seções</option>
+                <option value="">Todas as 20 Seções</option>
               </select>
               <div class="search-input-wrap">
                 <i>🔍</i>
                 <input type="text" class="form-input" id="searchTseInput" placeholder="Buscar candidato, seção ou colégio..." oninput="aoMudarFiltrosTSE()">
               </div>
+              <input type="file" id="inputCsvVotacaoRN" accept=".csv,.txt" style="display:none;" onchange="aoImportarCsvVotacaoRN(event)">
+              <button class="btn btn-gold btn-sm" onclick="dispararSeletorCsvTse()" title="Importar arquivo CSV oficial do TSE (votacao_secao_2024_RN.csv) filtrado para Riachuelo">📁 Carregar Votação RN (.csv)</button>
               <button class="btn btn-secondary btn-sm" onclick="exportarRelatorioTSECSV()">📥 Exportar Dados</button>
             </div>
           </div>
@@ -1297,6 +1299,7 @@
               <option value="Presidente">Cargo: Presidente</option>
               <option value="Governador">Cargo: Governador</option>
             </select>
+            <button class="btn btn-gold" onclick="dispararSeletorCsvTse()" title="Importar arquivo CSV oficial do TSE (votacao_secao_2024_RN.csv) filtrado para Riachuelo">📁 Carregar Votação RN (.csv)</button>
             <button class="btn btn-primary" onclick="exportarExcelRelatorioGeral()">📑 Exportar Excel (.xlsx)</button>
             <button class="btn btn-secondary" onclick="imprimirRelatorioExecutivo()">🖨️ Imprimir / PDF</button>
           </div>
@@ -1830,8 +1833,8 @@
                 </select>
               </div>
               <div class="form-group" style="margin:0;">
-                <label class="form-label">Valor do Benefício</label>
-                <input type="text" class="form-control" id="bancoAtivoNovoValor" value="R$ 600,00 / mês">
+                <label class="form-label">Situação do Auxílio</label>
+                <input type="text" class="form-control" id="bancoAtivoNovoValor" value="Ativo / Regular">
               </div>
               <div class="form-group" style="margin:0;">
                 <label class="form-label">Bairro / Comunidade</label>
@@ -24316,8 +24319,95 @@
           </div>
 
           <div class="form-group full">
+            <div id="alertaFinanceiroSolucao" style="display:none; margin-bottom:8px; padding:8px 12px; background:rgba(239,68,68,0.15); border:1px solid #ef4444; border-radius:6px; font-size:0.8rem; color:#fca5a5; align-items:center; gap:8px;">
+              <span>⛔ Registro restrito: Descreva apenas ações operacionais, melhorias estruturais e serviços públicos.</span>
+            </div>
             <label class="form-label">Encaminhamento / Ofícios / Notas de Solução</label>
-            <textarea class="form-control" id="formDemandaSolucaoNotas" rows="2" placeholder="Ex: Protocolado na Secretaria de Obras sob nº 241/2026..."></textarea>
+            <textarea class="form-control" id="formDemandaSolucaoNotas" rows="2" placeholder="Ex: Protocolado na Secretaria de Obras sob nº 241/2026..." oninput="aoDigitarSolucaoDemanda(event)"></textarea>
+          </div>
+
+          <!-- Seção Editável: Meu Prompt / Instruções de Solução -->
+          <div class="form-group full" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 14px; margin-top: 4px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+              <label class="form-label" style="margin:0; font-weight:700; color:var(--emerald-400); display:flex; align-items:center; gap:6px;">
+                <span>🤖 Meu Prompt / Instruções de Solução (Editável)</span>
+              </label>
+              <span style="font-size:0.75rem; color:var(--text-muted);">Edite seu prompt para padronizar ou agilizar a resolução</span>
+            </div>
+            <textarea class="form-control" id="formDemandaPromptTexto" rows="3" placeholder="Digite ou edite aqui seu prompt/diretriz de atendimento (ex: 'Encaminhar ofício prioritário solicitando patrolamento e drenagem da rua com cronograma de execução')..." style="border-color: rgba(16, 185, 129, 0.4); font-size:0.88rem;"></textarea>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-gold btn-sm" onclick="salvarPromptAtualComoFavorito()" style="font-size:0.75rem; padding:4px 10px;" title="Salva o texto acima como um atalho reutilizável">
+                  💾 Salvar como Meu Prompt Padrão
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="aplicarPromptNasNotasSolucao()" style="font-size:0.75rem; padding:4px 10px;" title="Copia o prompt editado diretamente para as notas de solução">
+                  📋 Inserir nas Notas de Solução
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="limparCampoPromptDemanda()" style="font-size:0.75rem; padding:4px 10px; color:var(--text-muted);">
+                  ✕ Limpar
+                </button>
+              </div>
+            </div>
+
+            <!-- Chips de Prompts Salvos pelo Usuário -->
+            <div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(16, 185, 129, 0.2);">
+              <div style="font-size:0.73rem; color:var(--text-muted); margin-bottom:6px; font-weight:600;">
+                ⭐ Meus Prompts Salvos (clique para carregar e editar):
+              </div>
+              <div id="listaChipsPromptsDemanda" style="display:flex; flex-wrap:wrap; gap:6px; min-height:22px;">
+                <!-- Carregado dinamicamente -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Seção de Anexo da Imagem de Resolução / Conclusão -->
+          <div class="form-group full" style="background: rgba(245, 158, 11, 0.06); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 14px; margin-top: 4px;">
+            <label class="form-label" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+              <span style="font-weight:700; color:var(--gold-400); display:flex; align-items:center; gap:6px;">
+                <span>✅ Imagem de Como Foi Resolvido (Comprovante de Conclusão)</span>
+              </span>
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">Foto da obra concluída, reparo ou entrega realizada</span>
+            </label>
+
+            <!-- Zona de Upload da Foto de Resolução -->
+            <input type="file" id="formDemandaFotoResolucaoInput" accept="image/*" style="display:none;" onchange="aoSelecionarFotoResolucaoDemanda(event)">
+            <input type="hidden" id="formDemandaFotoResolucaoBase64">
+
+            <div class="demanda-upload-zone" id="demandaFotoResolucaoUploadArea" onclick="document.getElementById('formDemandaFotoResolucaoInput').click()" style="padding:14px; border:2px dashed rgba(245, 158, 11, 0.4); cursor:pointer;">
+              <div class="upload-zone-content">
+                <span class="upload-zone-icon" style="font-size:1.6rem;">📷 ✅</span>
+                <div class="upload-zone-text">
+                  <strong style="color:var(--gold-400); font-size:0.88rem;">Clique ou arraste a foto comprovando a resolução</strong>
+                  <p style="margin:2px 0 0; font-size:0.75rem; color:var(--text-muted);">Suporta JPG, PNG e WEBP. Visível no Dossiê e relatório oficial</p>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); document.getElementById('formDemandaFotoResolucaoInput').click();" style="font-size:0.75rem; padding:4px 10px;">
+                  📂 Escolher Foto de Resolução
+                </button>
+              </div>
+            </div>
+
+            <!-- Preview da Imagem de Resolução -->
+            <div id="demandaFotoResolucaoPreviewContainer" style="display:none; margin-top:10px; background:rgba(0,0,0,0.4); border:1px solid rgba(245, 158, 11, 0.4); border-radius:8px; padding:10px; align-items:center; justify-content:space-between; gap:12px;">
+              <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+                <img id="demandaFotoResolucaoPreviewImg" src="" alt="Comprovante de Resolução" style="width:64px; height:64px; object-fit:cover; border-radius:6px; border:1px solid var(--border-gold); cursor:pointer;" onclick="ampliarFotoResolucaoAtual()" title="Clique para ampliar">
+                <div style="min-width:0;">
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="badge-status oficial" style="font-size:0.68rem; background:rgba(16,185,129,0.2); color:var(--emerald-400); border-color:var(--emerald-500);">✅ Comprovante Anexado</span>
+                  </div>
+                  <div id="demandaFotoResolucaoNome" style="font-size:0.8rem; color:#ffffff; font-weight:600; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px;">foto_resolucao.jpg</div>
+                  <div id="demandaFotoResolucaoInfo" style="font-size:0.72rem; color:var(--text-muted);">Pronto para gravação</div>
+                </div>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="ampliarFotoResolucaoAtual()" style="font-size:0.75rem; padding:4px 8px;" title="Visualizar em tamanho real">
+                  🔍 Ver
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="removerFotoResolucaoDemanda()" style="font-size:0.75rem; padding:4px 8px; color:#ef4444;" title="Remover imagem de resolução">
+                  🗑️ Remover
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Seção de Anexo de Fotos e Vídeos -->
@@ -24748,12 +24838,12 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- Scripts Próprios -->
-<script src="js/tse-data.js?v=20261104e"></script>
-<script src="js/seed-data.js?v=20261104e"></script>
-<script src="js/database.js?v=20261104e"></script>
-<script src="js/supabase-client.js?v=20261104e"></script>
-<script src="js/whatsapp-dispatcher.js?v=20261104e"></script>
-<script src="js/app.js?v=20261104e"></script>
+<script src="js/tse-data.js?v=20261106a"></script>
+<script src="js/seed-data.js?v=20261106a"></script>
+<script src="js/database.js?v=20261106a"></script>
+<script src="js/supabase-client.js?v=20261106a"></script>
+<script src="js/whatsapp-dispatcher.js?v=20261106a"></script>
+<script src="js/app.js?v=20261106a"></script>
 <script>
   (function garantirListaNomesBeneficiosInterativa() {
     function boot() {

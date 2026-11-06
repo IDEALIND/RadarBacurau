@@ -127,6 +127,32 @@ const SupabaseClient = {
     }
   },
 
+  // Normalizador de Eleitores: Compatibiliza nomes de colunas camelCase / snake_case da Nuvem
+  normalizarEleitor(e) {
+    if (!e || typeof e !== "object") return e;
+    return {
+      id: e.id,
+      nome: e.nome || "",
+      dataNascimento: e.dataNascimento || e.data_nascimento || "",
+      numeroTitulo: e.numeroTitulo || e.numero_titulo || "",
+      intencaoPrefeito: e.intencaoPrefeito || e.intencao_prefeito || "",
+      intencaoVereador: e.intencaoVereador || e.intencao_vereador || "",
+      rua: e.rua || "",
+      numero: e.numero || "",
+      endereco: e.endereco || "",
+      comunidadeId: e.comunidadeId || e.comunidade_id || "",
+      bairroNome: e.bairroNome || e.bairro || "",
+      secao: e.secao || "",
+      liderancaNome: e.liderancaNome || e.lideranca || "",
+      liderancaId: e.liderancaId || e.lideranca_id || null,
+      telefone: e.telefone || "",
+      fotoTitulo: e.fotoTitulo || e.foto_titulo || "",
+      observacoes: e.observacoes || "",
+      dataCadastro: e.dataCadastro || e.data_cadastro || (e.criado_em ? new Date(e.criado_em).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR")),
+      zona: e.zona || "008"
+    };
+  },
+
   // Sincronização Completa (Puxa tudo da Nuvem para o banco local)
   async sincronizarTudo() {
     if (!this.isConnected() || this.isSyncing) return;
@@ -138,7 +164,8 @@ const SupabaseClient = {
       if (!errEleitores && Array.isArray(eleitoresNuvem) && eleitoresNuvem.length > 0) {
         // Faz merge com os locais (preservando fotos e datas mais recentes)
         if (!db.data.eleitores) db.data.eleitores = [];
-        eleitoresNuvem.forEach(eNuvem => {
+        eleitoresNuvem.forEach(raw => {
+          const eNuvem = this.normalizarEleitor(raw);
           const idx = db.data.eleitores.findIndex(el => el.id === eNuvem.id);
           if (idx !== -1) {
             db.data.eleitores[idx] = { ...db.data.eleitores[idx], ...eNuvem };
@@ -285,19 +312,27 @@ const SupabaseClient = {
         .on("postgres_changes", { event: "*", schema: "public", table: "eleitores" }, payload => {
           console.log("⚡ [Realtime] Mudança em Eleitores recebida do celular/nuvem:", payload);
           if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
-            const idx = (db.data.eleitores || []).findIndex(e => e.id === payload.new.id);
+            const itemNorm = this.normalizarEleitor(payload.new);
+            const idx = (db.data.eleitores || []).findIndex(e => e.id === itemNorm.id);
             if (idx !== -1) {
-              db.data.eleitores[idx] = payload.new;
+              db.data.eleitores[idx] = { ...db.data.eleitores[idx], ...itemNorm };
             } else {
               if (!db.data.eleitores) db.data.eleitores = [];
-              db.data.eleitores.unshift(payload.new);
+              db.data.eleitores.unshift(itemNorm);
             }
           } else if (payload.eventType === "DELETE") {
-            db.data.eleitores = (db.data.eleitores || []).filter(e => e.id !== payload.old.id);
+            db.data.eleitores = (db.data.eleitores || []).filter(e => e.id !== payload.old?.id);
           }
           db.save();
-          if (typeof renderEleitores === "function" && AppState.currentView === "eleitores") renderEleitores();
-          if (typeof WhatsAppDispatcher !== "undefined" && AppState.currentView === "whatsapp") WhatsAppDispatcher.aplicarFiltrosInterface();
+          if (typeof updateSidebarCounters === "function") updateSidebarCounters();
+          if (typeof renderEleitores === "function" && typeof AppState !== "undefined" && AppState.currentView === "eleitores") renderEleitores();
+          if (typeof renderDashboard === "function" && typeof AppState !== "undefined" && AppState.currentView === "dashboard") renderDashboard();
+          if (typeof carregarMarcadoresMapa === "function" && typeof AppState !== "undefined" && AppState.currentView === "mapa") {
+            carregarMarcadoresMapa();
+            if (typeof renderTabelaLocalidadesMapa === "function") renderTabelaLocalidadesMapa();
+            if (typeof atualizarMetometroConsolidado === "function") atualizarMetometroConsolidado();
+          }
+          if (typeof WhatsAppDispatcher !== "undefined" && typeof AppState !== "undefined" && AppState.currentView === "whatsapp") WhatsAppDispatcher.aplicarFiltrosInterface();
           if (typeof showToast === "function") showToast(`⚡ Novo eleitor sincronizado em tempo real da equipe!`);
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "liderancas" }, payload => {
@@ -390,7 +425,61 @@ const SupabaseClient = {
   async salvarEleitorNuvem(eleitor) {
     if (!this.isConnected() || !eleitor) return;
     try {
-      await this.client.from("eleitores").upsert([eleitor]);
+      const payload = {
+        id: eleitor.id,
+        nome: eleitor.nome,
+        dataNascimento: eleitor.dataNascimento || eleitor.data_nascimento || "",
+        numero_titulo: eleitor.numeroTitulo || eleitor.numero_titulo || "",
+        numeroTitulo: eleitor.numeroTitulo || eleitor.numero_titulo || "",
+        rua: eleitor.rua || "",
+        numero: eleitor.numero || "",
+        endereco: eleitor.endereco || "",
+        bairroNome: eleitor.bairroNome || eleitor.bairro || "",
+        comunidadeId: eleitor.comunidadeId || eleitor.comunidade_id || "",
+        secao: eleitor.secao || "",
+        intencaoPrefeito: eleitor.intencaoPrefeito || eleitor.intencao_prefeito || "",
+        intencaoVereador: eleitor.intencaoVereador || eleitor.intencao_vereador || "",
+        zona: eleitor.zona || "008",
+        liderancaNome: eleitor.liderancaNome || eleitor.lideranca || "",
+        liderancaId: eleitor.liderancaId || eleitor.lideranca_id || null,
+        telefone: eleitor.telefone || "",
+        observacoes: eleitor.observacoes || "",
+        fotoTitulo: eleitor.fotoTitulo || eleitor.foto_titulo || "",
+        dataCadastro: eleitor.dataCadastro || eleitor.data_cadastro || new Date().toLocaleDateString("pt-BR")
+      };
+
+      const { error } = await this.client.from("eleitores").upsert([payload]);
+      if (error) {
+        console.warn("⚠️ [Supabase] Tentando payload alternativo para eleitor:", error.message);
+        const payloadFallback = {
+          id: eleitor.id,
+          nome: eleitor.nome,
+          data_nascimento: eleitor.dataNascimento || eleitor.data_nascimento || "",
+          numero_titulo: eleitor.numeroTitulo || eleitor.numero_titulo || "",
+          rua: eleitor.rua || "",
+          numero: eleitor.numero || "",
+          endereco: eleitor.endereco || "",
+          bairro: eleitor.bairroNome || eleitor.bairro || "",
+          comunidade_id: eleitor.comunidadeId || eleitor.comunidade_id || "",
+          secao: eleitor.secao || "",
+          intencao_prefeito: eleitor.intencaoPrefeito || eleitor.intencao_prefeito || "",
+          intencao_vereador: eleitor.intencaoVereador || eleitor.intencao_vereador || "",
+          lideranca: eleitor.liderancaNome || eleitor.lideranca || "",
+          lideranca_id: eleitor.liderancaId || eleitor.lideranca_id || null,
+          telefone: eleitor.telefone || "",
+          observacoes: eleitor.observacoes || "",
+          foto_titulo: eleitor.fotoTitulo || eleitor.foto_titulo || "",
+          data_cadastro: eleitor.dataCadastro || eleitor.data_cadastro || new Date().toLocaleDateString("pt-BR")
+        };
+        const { error: err2 } = await this.client.from("eleitores").upsert([payloadFallback]);
+        if (err2) {
+          console.error("❌ [Supabase] Erro ao persistir eleitor na nuvem:", err2.message);
+        } else {
+          console.log("☁️ [Supabase] Eleitor sincronizado via fallback!");
+        }
+      } else {
+        console.log("☁️ [Supabase] Eleitor sincronizado com sucesso na nuvem!");
+      }
     } catch (e) {
       console.error("Erro ao salvar eleitor no Supabase:", e);
     }

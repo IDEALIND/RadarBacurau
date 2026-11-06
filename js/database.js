@@ -126,6 +126,13 @@ class RadarBacurauDB {
             return login !== "alter" && nome !== "altemar gabriel";
           });
         }
+
+        // Garante que resultadosEleitorais contenha a base histórica oficial com as 20 seções de 2024 de Riachuelo
+        if (!this.data.resultadosEleitorais || !this.data.resultadosEleitorais.length || !this.data.resultadosEleitorais.some(r => Number(r.ano) === 2024)) {
+          if (typeof TSE_HISTORICO_SECOES !== 'undefined' && Array.isArray(TSE_HISTORICO_SECOES)) {
+            this.data.resultadosEleitorais = JSON.parse(JSON.stringify(TSE_HISTORICO_SECOES));
+          }
+        }
         this.sincronizarLiderancasComBairros();
         this.save();
       } else {
@@ -1055,7 +1062,7 @@ class RadarBacurauDB {
 
   // --- RESULTADOS HISTÓRICOS TSE (2014-2026) POR SEÇÃO ---
   getResultadosEleitorais(filtros = {}) {
-    let list = (this.data.resultadosEleitorais && this.data.resultadosEleitorais.length > 0)
+    let list = (this.data.resultadosEleitorais && this.data.resultadosEleitorais.length > 0 && this.data.resultadosEleitorais.some(r => Number(r.ano) === 2024))
       ? this.data.resultadosEleitorais 
       : (typeof TSE_HISTORICO_SECOES !== 'undefined' ? TSE_HISTORICO_SECOES : []);
 
@@ -1085,6 +1092,29 @@ class RadarBacurauDB {
       );
     }
     return list;
+  }
+
+  importarResultadosTSE(novosResultados) {
+    if (!Array.isArray(novosResultados) || novosResultados.length === 0) return false;
+    
+    if (!this.data.resultadosEleitorais || !Array.isArray(this.data.resultadosEleitorais)) {
+      this.data.resultadosEleitorais = [];
+    }
+
+    const mapa = {};
+    this.data.resultadosEleitorais.forEach(r => {
+      mapa[r.id] = r;
+    });
+
+    novosResultados.forEach(r => {
+      mapa[r.id] = r;
+    });
+
+    this.data.resultadosEleitorais = Object.values(mapa);
+    this.data.hasCustomTseImport = true;
+    this.save();
+    this.logAuditoria("Importação TSE", "Estatísticas Oficiais", `Importados ${novosResultados.length} registros eleitorais de Riachuelo via arquivo CSV.`);
+    return true;
   }
 
   getAnosEleicoes() {
@@ -1168,21 +1198,24 @@ class RadarBacurauDB {
     let list = this.data.eleitores || [];
 
     // Se o usuário atual for Liderança Comunitária, eleitor só é dele (visualização exclusiva)
+    // Para ADMINISTRADOR MASTER (ou qualquer perfil administrativo), visualiza todos os eleitores de todas as lideranças
     const currentUser = this.getCurrentUser();
     const isLider = currentUser && currentUser.perfil === "LIDERANÇA COMUNITÁRIA";
     if (isLider) {
       const nomeLider = (currentUser.nome || "").trim().toLowerCase();
       list = list.filter(e => {
-        const eLid = (e.liderancaNome || "").trim().toLowerCase();
-        return eLid === nomeLider || (currentUser.liderancaId && e.liderancaId === currentUser.liderancaId);
+        const eLid = (e.liderancaNome || e.lideranca || "").trim().toLowerCase();
+        return eLid === nomeLider || 
+               (currentUser.liderancaId && (e.liderancaId === currentUser.liderancaId || e.lideranca_id === currentUser.liderancaId)) || 
+               (currentUser.id && e.criadoPor === currentUser.id);
       });
     } else if (filtros.lideranca) {
       const filtroLid = filtros.lideranca.trim().toLowerCase();
-      list = list.filter(e => (e.liderancaNome || "").trim().toLowerCase() === filtroLid);
+      list = list.filter(e => ((e.liderancaNome || e.lideranca || "").trim().toLowerCase() === filtroLid));
     }
 
     if (filtros.bairro) {
-      list = list.filter(e => e.bairroNome === filtros.bairro || e.comunidadeId === filtros.bairro);
+      list = list.filter(e => (e.bairroNome || e.bairro) === filtros.bairro || (e.comunidadeId || e.comunidade_id) === filtros.bairro);
     }
     if (filtros.secao) {
       list = list.filter(e => String(e.secao) === String(filtros.secao));
@@ -1192,13 +1225,13 @@ class RadarBacurauDB {
       const qDigits = q.replace(/\D/g, "");
       list = list.filter(e => 
         (e.nome && e.nome.toLowerCase().includes(q)) ||
-        (e.numeroTitulo && qDigits && e.numeroTitulo.replace(/\D/g, "").includes(qDigits)) ||
+        ((e.numeroTitulo || e.numero_titulo) && qDigits && String(e.numeroTitulo || e.numero_titulo).replace(/\D/g, "").includes(qDigits)) ||
         (e.intencaoPrefeito && e.intencaoPrefeito.toLowerCase().includes(q)) ||
         (e.intencaoVereador && e.intencaoVereador.toLowerCase().includes(q)) ||
         (e.rua && e.rua.toLowerCase().includes(q)) ||
         (e.endereco && e.endereco.toLowerCase().includes(q)) ||
-        (e.bairroNome && e.bairroNome.toLowerCase().includes(q)) ||
-        (e.liderancaNome && e.liderancaNome.toLowerCase().includes(q)) ||
+        ((e.bairroNome || e.bairro) && (e.bairroNome || e.bairro).toLowerCase().includes(q)) ||
+        ((e.liderancaNome || e.lideranca) && (e.liderancaNome || e.lideranca).toLowerCase().includes(q)) ||
         (e.secao && String(e.secao).includes(q)) ||
         (e.telefone && e.telefone.includes(q))
       );
@@ -1360,20 +1393,25 @@ class RadarBacurauDB {
     if (isLider) {
       const nomeLider = (currentUser.nome || "").trim().toLowerCase();
       eleitores = eleitores.filter(e => {
-        const eLid = (e.liderancaNome || "").trim().toLowerCase();
-        return eLid === nomeLider || (currentUser.liderancaId && e.liderancaId === currentUser.liderancaId);
+        const eLid = (e.liderancaNome || e.lideranca || "").trim().toLowerCase();
+        return eLid === nomeLider || 
+               (currentUser.liderancaId && (e.liderancaId === currentUser.liderancaId || e.lideranca_id === currentUser.liderancaId)) ||
+               (currentUser.id && e.criadoPor === currentUser.id);
       });
     }
     const total = eleitores.length;
-    const totalComFoto = eleitores.filter(e => e.fotoTitulo && e.fotoTitulo.trim() !== "").length;
+    const totalComFoto = eleitores.filter(e => {
+      const ft = e.fotoTitulo || e.foto_titulo;
+      return ft && String(ft).trim() !== "";
+    }).length;
 
     const mapaBairros = {};
     const mapaLiderancas = {};
     const mapaSecoes = {};
 
     eleitores.forEach(e => {
-      const b = e.bairroNome || "Não Informado";
-      const l = e.liderancaNome || "Sem Liderança Vinculada";
+      const b = e.bairroNome || e.bairro || "Não Informado";
+      const l = e.liderancaNome || e.lideranca || "Sem Liderança Vinculada";
       const s = e.secao || "Sem Seção";
 
       // Bairros

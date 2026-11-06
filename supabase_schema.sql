@@ -14,12 +14,14 @@ create table if not exists public.eleitores (
   numero text,
   endereco text,
   "bairroNome" text,
+  bairro text,
   "comunidadeId" text,
   secao text,
   "intencaoPrefeito" text,
   "intencaoVereador" text,
   zona text default '008',
   "liderancaNome" text,
+  lideranca text,
   "liderancaId" text,
   telefone text,
   observacoes text,
@@ -27,6 +29,21 @@ create table if not exists public.eleitores (
   "dataCadastro" text,
   criado_em timestamp with time zone default timezone('utc'::text, now())
 );
+
+-- Garante compatibilidade caso a tabela já tenha sido criada anteriormente
+alter table public.eleitores add column if not exists "bairroNome" text;
+alter table public.eleitores add column if not exists bairro text;
+alter table public.eleitores add column if not exists "liderancaNome" text;
+alter table public.eleitores add column if not exists lideranca text;
+alter table public.eleitores add column if not exists "liderancaId" text;
+alter table public.eleitores add column if not exists "fotoTitulo" text;
+alter table public.eleitores add column if not exists "dataCadastro" text;
+alter table public.eleitores add column if not exists "dataNascimento" text;
+alter table public.eleitores add column if not exists "numeroTitulo" text;
+alter table public.eleitores add column if not exists numero_titulo text;
+alter table public.eleitores add column if not exists "comunidadeId" text;
+alter table public.eleitores add column if not exists "intencaoPrefeito" text;
+alter table public.eleitores add column if not exists "intencaoVereador" text;
 
 -- 2. TABELA DE LIDERANÇAS
 create table if not exists public.liderancas (
